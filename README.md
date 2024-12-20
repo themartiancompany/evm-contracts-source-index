@@ -1,4 +1,10 @@
 # EVM Smart Contracts Source Index
 
-An application to verify smart contract source
-directly on-chain.
+Verifies smart contract source
+directly on-chain, indendently from the blockchain
+on which it is deployed.
+
+## License
+
+This program is released under the terms of the GNU
+Affero General Public License version 3.0.
