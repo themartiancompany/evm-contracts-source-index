@@ -105,7 +105,8 @@ _global_variables() {
   contract_address=""
   contract_source=""
   evm_version=""
-  solc_version=""
+  target_compiler=""
+  compiler_version=""
   color=""
   quiet=""
 }
@@ -365,19 +366,30 @@ _contract_prepare() {
 
 _source_locked_check() {
   local \
-    _source_locked_call_opts=()
+    _source_locked_call_opts=() \
+    _locked \
+    _msg=()
   _source_locked_call_opts_setup 
   _locked="$( \
     evm-contract-call \
       "${_source_locked_call_opts[@]}" \
       "${_si_address}" \
       "lock" \
-      "${_namespace}" \
       "${_target_publisher}" \
-      "${_target_price}" \
-      "${_target_uri}")"
-
-    # mapping(address => mapping (uint256 => mapping(address => bool))) public lock;
+      "${_contract_network}"
+      "${_contract_address}")"
+  if [[ "${_locked}" == "true" ]]; then
+    _msg=(
+      "Contract source URI for contract"
+      "with address '${_contract_address}'"
+      "on network '${_contract_network}'"
+      "by publisher '${_target_publisher}'"
+      "already locked."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
 }
 
 _evm_contract_source_publish() {
@@ -399,7 +411,8 @@ _evm_contract_source_publish() {
     _contract_address="${15}" \
     _contract_source="${16}" \
     _evm_version="${17}" \
-    _solc_version="${18}" \
+    _target_compiler="${18}" \
+    _compiler_version="${19}" \
     _msg=() \
     _contract_dir \
     _contract_name \
@@ -465,14 +478,17 @@ _evm_contract_source_publish() {
       "${_si_bytecode}" \
       "${_si_compiler_output}"
     _msg=(
-      "Publishing contract source '${_contract_source}'"
-      "for contract '${_contract_name}'"
+      "Publisher"
+      "'${_target_publisher}' posting"
+      "source code '${_contract_source}'"
+      "for '${_contract_name}' contract"
       "on network '${_contract_network}'"
-      "and address '${_contract_address}'"
+      "and address '${_contract_address}',"
       "pointing to EVMFS URI '${_source_uri}',"
       "set to be built for EVM version"
-      "'${_evm_version}' and solc version"
-      "'${_solc_version}' on the EVM Contracts'"
+      "'${_evm_version}', compiler"
+      "'${_target_compiler}' version"
+      "'${_compiler_version}' on the EVM Contracts'"
       "Source Index of network '${_target_network}'."
     )
     _msg_info \
@@ -802,7 +818,8 @@ Usage:
     <contract_address>
     <contract_source>
     <evm_version>
-    <solc_version>
+    <compiler>
+    <compiler_version>
 
   networks:
 $(_display_networks \
@@ -887,7 +904,8 @@ _show_config() {
   _msg_info "           Contract address:   ${contract_address}"
   _msg_info "            Target contract:   ${contract_source}"
   _msg_info "         Target EVM version:   ${evm_version}"
-  _msg_info "        Target Solc version:   ${solc_version}"
+  _msg_info "            Target compiler:   ${target_compiler}"
+  _msg_info "    Target compiler version:   ${compiler_version}"
 }
 
 _globals
@@ -979,7 +997,15 @@ if (( $# < 4 )); then
 fi
 if (( $# < 5 )); then
   _msg_error \
-    "No Solc version specified." \
+    "No compiler specified." \
+    0
+  _set_overrides
+  _usage \
+    1
+fi
+if (( $# < 6 )); then
+  _msg_error \
+    "No compiler version specified." \
     0
   _set_overrides
   _usage \
@@ -989,7 +1015,8 @@ contract_network="${1}"
 contract_address="${2}"
 target_contract="${3}"
 evm_version="${4}"
-solc_version="${5}"
+target_compiler="${5}"
+compiler_version="${6}"
 _config_user_init \
   "${app_name}"
 _set_overrides
@@ -1012,7 +1039,8 @@ app_opts=(
   "${contract_address}"
   "${contract_source}"
   "${evm_version}"
-  "${solc_version}"
+  "${target_compiler}"
+  "${compiler_version}"
 )
 _evm_contract_source_publish \
   "${app_opts[@]}"
