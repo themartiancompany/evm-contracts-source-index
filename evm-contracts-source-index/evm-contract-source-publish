@@ -1,0 +1,1290 @@
+#!/usr/bin/env bash
+
+# SPDX-License-Identifier: AGPL-3.0
+
+#    ----------------------------------------------------------------------
+#    Copyright © 2024, 2025  Pellegrino Prevete
+#
+#    All rights reserved
+#    ----------------------------------------------------------------------
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU Affero General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU Affero General Public License for more details.
+#
+#    You should have received a copy of the GNU Affero General Public License
+#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+_bin="$( \
+  dirname \
+    "$( \
+      command \
+        -v \
+	  "env")")"
+_lib="${_bin}/../lib"
+_share="${_bin}/../share"
+source \
+  "${_lib}/libcrash-bash/crash-bash"
+source \
+  "${_lib}/libevm/libevm"
+
+# Check all required programs
+# are available
+_requirements() {
+  local \
+    _zlib
+  _check_cmd \
+    'evm-contract-call' \
+    'evm-contracts-tools'
+  _check_cmd \
+    'evm-contract-deployment-networks' \
+    'evm-contracts-tools'
+  _check_cmd \
+    'evm-wallet'
+  _check_cmd \
+    'git'
+  _check_cmd \
+    'evm-gpg' \
+    'evm-gnupg'
+  _check_cmd \
+    'find' \
+    'findutils'
+  _check_cmd \
+    'gpg-key-info'
+  _check_cmd \
+    'libevm-requirements' \
+    'libevm'
+  libevm-requirements
+  _check_cmd \
+    'rsync'
+  _check_cmd \
+    'tar'
+  _zlib="$( \
+    find \
+      "$(_get_lib)/libz."* \
+      -type \
+        "f" \
+        2>/dev/null || \
+    true)"
+  if [[ "${_zlib}" == "" ]]; then
+    _msg_error \
+      "No Zlib library detected." \
+      1
+  fi
+  _check_cmd \
+    'ur'
+}
+
+# shellcheck disable=SC2034
+_global_variables() {
+  publishing_date=()
+  si_address=""
+  si_version=""
+  deployments_dir=""
+  user_level=""
+  wallet_name=""
+  wallet_path=""
+  wallet_password=""
+  wallet_seed=""
+  wallet_address=""
+  target_network=""
+  api_key=""
+  cache_dir=""
+  gnupg_home=""
+  target_contract=""
+  evm_version=""
+  solc_version=""
+  color=""
+  quiet=""
+}
+
+_conf_dir_auto_detect() {
+  local \
+    _dir
+  _dir="${HOME}/.config/${app_name}"
+  echo \
+    "${_dir}"
+}
+
+_cache_dir_auto_detect() {
+  local \
+    _dir
+  _dir="${HOME}/.cache/${app_name}"
+  echo \
+    "${_dir}"
+}
+
+_contract_sign() {
+  local \
+    _source_repo="${1}" \
+    _pkg="${2}" \
+    _gnupg_home="${3}" \
+    _key_fingerprint="${4}" \
+    _gpg_opts=() \
+    _msg=()
+  _msg=(
+    "Signing source recipe repo"
+    "archive '${_source_repo}/${_pkg}.tar.xz'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _gpg_opts+=(
+    --homedir
+      "${_gnupg_home}"
+    --local-user
+      "${_key_fingerprint}"
+    --sign
+    --output
+      "${_source_repo}/${_pkg}.tar.xz.gpg"
+  )
+  if [[ "${quiet}" == "n" ]]; then
+    _msg=(
+      "Source recipe repo"
+      "contents:"
+    )
+    _msg_info \
+      "${_msg[*]}"
+    tree \
+      "${_source_repo}"
+  fi
+  gpg \
+    "${_gpg_opts[@]}" \
+    "${_source_repo}/${_pkg}.tar.xz"
+}
+
+_contract_compress() {
+  local \
+    _source_dir="${1}" \
+    _pkg="${2}" \
+    _msg=()
+  _msg=(
+    "Compressing source recipe"
+    "repository for package"
+    "'${_pkg}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  XZ_OPT="-e9" \
+  tar \
+    --transform \
+      "s%^${_source_dir#/}/${_pkg}%${_pkg}%" \
+    --create \
+    --file \
+      "${_source_dir}/${_pkg}.tar.xz" \
+    --xz \
+    "${_source_dir}/${_pkg}"
+}
+
+_contract_upload() {
+  local \
+    _source_dir="${1}" \
+    _pkg="${2}" \
+    _wallet_name="${3}" \
+    _wallet_path="${4}" \
+    _wallet_password="${5}" \
+    _wallet_seed="${6}" \
+    _target_network="${7}" \
+    _api_key_path="${8}" \
+    _evmfs_opts=() \
+    _evmfs_uri_opts=() \
+    _msg=()
+  _msg=(
+    "Uploading source recipe"
+    "repository signed archive"
+    "'${_source_dir}/${_pkg}.tar.xz.gpg'"
+    "for package '${_pkg}' to the EVMFS."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  if [[ ! -v "EVMFS_OPTS" ]]; then
+    _evmfs_opts+=(
+      -N
+        "${_wallet_name}"
+      -w
+        "${_wallet_path}"
+      -p
+        "${_wallet_password}"
+      -s
+        "${_wallet_seed}"
+      -n
+        "${_target_network}"
+      -k
+        "${_api_key_path}"
+      -m
+        "standalone"
+    )
+  else
+    _evmfs_opts+=(
+      $EVMFS_OPTS
+    )
+  fi
+  _evmfs_uri_opts+=(
+    "${_evmfs_opts[@]}"
+    -m
+      "simulate"
+  )
+  if [[ "${quiet}" == "n" ]]; then
+    _evmfs_opts+=(
+      -v
+    )
+  fi
+  evmfs \
+    "${_evmfs_opts[@]}" \
+    publish \
+      "${_source_dir}/${_pkg}.tar.xz.gpg"
+  _msg=(
+    "Getting uploaded source recipe"
+    "repository signed archive"
+    "'${_source_dir}/${_pkg}.tar.xz.gpg'"
+    "EVMFS uri."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _target_uri="$( \
+    evmfs \
+      "${_evmfs_uri_opts[@]}" \
+      publish \
+        "${_source_dir}/${_pkg}.tar.xz.gpg")"
+}
+
+_contract_call_opts_setup() {
+  _contract_call_opts+=(
+    -n
+      "${_target_network}"
+    -N
+      "${_wallet_name}"
+    -k
+      "${_api_key_path}"
+    -A
+      "${_abi}"
+    -B
+      "${_bytecode}"
+    -C
+      "${_compiler_output}"
+  )
+}
+
+_publish_call_opts_setup() {
+  local \
+    _abi="${1}" \
+    _bytecode="${2}" \
+    _compiler_output="${3}" \
+    _contract_call_opts=()
+  _contract_call_opts_setup
+  if [[ "${quiet}" == "n" ]]; then
+    _publish_call_opts+=(
+      -v
+    )
+  fi
+  _publish_call_opts+=(
+    "${_contract_call_opts[@]}"
+    -t
+      "dynamic"
+  )
+}
+
+_package_list_call_opts_setup() {
+  local \
+    _abi="${1}" \
+    _bytecode="${2}" \
+    _compiler_output="${3}" \
+    _contract_call_opts=()
+  _contract_call_opts_setup
+  _unlisted_check_call_opts+=(
+    "${_contract_call_opts[@]}"
+    -t
+      "static"
+  )
+  if [[ "${quiet}" == "n" ]]; then
+    _package_list_call_opts+=(
+      -v
+    )
+  fi
+  _package_list_call_opts+=(
+    "${_contract_call_opts[@]}"
+    -t
+      "dynamic"
+  )
+}
+
+_publisher_check_call_opts_setup() {
+  local \
+    _abi="${1}" \
+    _bytecode="${2}" \
+    _compiler_output="${3}" \
+    _contract_call_opts=()
+  _contract_call_opts_setup
+  _publisher_check_call_opts+=(
+    "${_contract_call_opts[@]}"
+    -t
+      "static"
+  )
+}
+
+_ether_to_wei() {
+  local \
+    _ether="${1}" \
+    _unit
+  _scale=1000000000000000000
+  echo \
+    "$((_ether * _scale))"
+}
+
+_evmfs_uri_check() {
+  local \
+    _uri="${1}" \
+    _msg=()
+  if [[ "${_uri}" != "evmfs://"* ]]; then
+    _msg=(
+      "Signed package recipe archive"
+      "URI must be an EVMFS uri."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+}
+
+_evm_contract_source_publish() {
+  local \
+    _si_address="${1}" \
+    _si_version="${2}" \
+    _deployments_dir="${3}" \
+    _wallet_name="${4}" \
+    _wallet_path="${5}" \
+    _wallet_password="${6}" \
+    _wallet_seed="${7}" \
+    _target_network="${8}" \
+    _api_key_path="${9}" \
+    _cache_dir="${10}" \
+    _source_publish="${11}" \
+    _contract_address="${12}" \
+    _evm_version="${13}" \
+    _solc_version="${14}" \
+    _target_contract="${15}" \
+    _msg=() \
+    _si_abi \
+    _si_bytecode \
+    _si_compiler_output \
+    _publish_call_opts=()
+  _msg=(
+    "Publishing source for"
+    "contract '${_target_contract}'"
+    "on the Source Index."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _contract_artifacts_auto_detect \
+    "${_deployments_dir}" \
+    "${_target_network}" \
+    "SourceIndex" \
+    "_si" \
+    "${_si_version}"
+  if [[ "${_source_publish}" == "n" ]]; then
+    _msg=(
+      "Skipping recipe publishing."
+    )
+    _msg_info \
+      "${_msg[*]}"
+  elif [[ "${_recipe_publish}" == "y" ]]; then
+    if [[ "${_target_uri}" == "" ]]; then
+      _ur_compress \
+        "${_work_dir}" \
+        "${_package}"
+      _ur_sign \
+        "${_work_dir}" \
+        "${_package}" \
+        "${_gnupg_home}" \
+        "${_key_fingerprint}"
+      _ur_upload \
+        "${_work_dir}" \
+        "${_package}" \
+        "${_wallet_name}" \
+        "${_wallet_path}" \
+        "${_wallet_password}" \
+        "${_wallet_seed}" \
+        "${_target_network}" \
+        "${_api_key_path}"
+    elif [[ "${_target_uri}" != "" ]]; then
+      _msg=(
+        "Signed recipe archive URI '${_target_uri}'"
+        "specified through command line, skipping"
+        "upload."
+      )
+      _msg_info \
+        "${_msg[*]}"
+      _evmfs_uri_check \
+        "${_target_uri}"
+    fi
+    _publish_call_opts_setup \
+      "${_ur_abi}" \
+      "${_ur_bytecode}" \
+      "${_ur_compiler_output}"
+    _msg=(
+      "Publishing package '${_package}'"
+      "for publisher '${_target_publisher}'"
+      "with URI '${_target_uri}' and"
+      "price '${_target_price}'"
+      "'${_measure_unit}' on the Ur."
+    )
+    _msg_info \
+      "${_msg[*]}"
+    if [[ "${_measure_unit}" == "ether" ]]; then
+      _target_price="$( \
+        _ether_to_wei \
+          "${_target_price}")"
+    fi
+    evm-contract-call \
+      "${_publish_call_opts[@]}" \
+      "${_ur_address}" \
+      "publishRecipe" \
+      "${_package}" \
+      "${_target_publisher}" \
+      "${_target_price}" \
+      "${_target_uri}"
+    _msg=(
+      "Package '${_package}' correctly published."
+    )
+    _msg_info \
+      "${_msg[*]}"
+  fi
+  if [[ "${_package_list}" == "y" ]]; then
+    _ur_package_publisher_list \
+      "${_pp_address}" \
+      "${_ur_address}" \
+      "${_up_address}" \
+      "${_package}" \
+      "${_target_publisher}"
+  fi
+}
+
+_fur_pub() {
+  local \
+    _dir="${1}" \
+    _pkg="${2}" \
+    _publisher="${3}" \
+    _fingerprint="${4}" \
+    _platform="${5}" \
+    _packages=() \
+    _package \
+    _oldpwd \
+    _signature_detached \
+    _msg=()
+  shift \
+    5
+  _packages+=(
+    "$@"
+  )
+  _msg=(
+    "Publishing binary packages"
+    "'${_binary_pkgs[*]}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _signature_detached="y"
+  _oldpwd="$( \
+    pwd)"
+  _msg_info \
+   "Add ${_publisher}"
+   "remote in repo '${_dir}/${_pub}'"
+  git \
+    -C \
+      "${_dir}/${_pub}" \
+    remote \
+      add \
+        tmc \
+        "github:${_publisher}/${_pub}"
+  git \
+    -C \
+      "${_dir}/${_pub}" \
+    remote \
+      add \
+        gl \
+        "gitlab:${_publisher}/${_pub}"
+  git \
+    -C \
+      "${_dir}/${_pub}" \
+    checkout \
+      -b \
+      "${_pkg}" || \
+  git \
+    -C \
+      "${_dir}/${_pub}" \
+    checkout \
+      "${_pkg}"
+  for _package \
+    in "${_packages[@]}"; do
+    _msg_info \
+      "publishing package: ${_package}" 
+    _arch="$( \
+      _get_arch \
+        "${_package}")"
+    _package_dir="${_platform}/${_arch}"
+    _msg=(
+      "publishing origin ${_origin} directory ${_dir}"
+      "in ${_pub} directory '${_dir}/${_package_dir}'"
+    )
+    _msg_info \
+      "${_msg[*]}"
+    mkdir \
+      -p \
+      "${_dir}/${_pub}/${_package_dir}"
+    rsync \
+      -v \
+      -a \
+      "${_pkg[@]}" \
+      "${_dir}/${_pub}/${_package_dir}"
+  done
+  _msg_info \
+    "entering ${_dir}/${_pub}"
+  cd \
+    "${_dir}/${_pub}"
+  "_${_pub}_sign" \
+    "${_dir}/${_pub}/${_package_dir}" \
+    "${_pgp_fingerprint}" \
+    "${_signature_detached}"
+  git \
+    add \
+      .
+  git \
+    commit \
+      -a \
+      -S \
+      -m \
+        "publish"
+  git \
+    push \
+      tmc 
+  git \
+    push \
+      gl || \
+    true
+  cd \
+    "${_oldpwd}"
+}
+
+_pub_opts_setup() {
+  if [[ "${_publishing_platform}" == "ur" ]]; then
+    _pub_opts+=(
+      "${_ur_address}"
+      "${_ur_version}"
+      "${_up_address}"
+      "${_pp_address}"
+      "${_deployments_dir}"
+      "${_wallet_name}"
+      "${_wallet_path}"
+      "${_wallet_password}"
+      "${_wallet_seed}"
+      "${_target_network}"
+      "${_api_key_path}"
+      "${_target_publisher}"
+      "${_target_price}"
+      "${_measure_unit}"
+      "${_target_uri}"
+      "${_recipe_publish}"
+      "${_package_list}"
+      "${_source_tmp_dir}"
+      "${_gnupg_home}"
+      "${_key_fingerprint}"
+      "${_pkg}"
+    )
+  elif [[ "${_publishing_platform}" == "fur" ]]; then
+    _pub_opts+=(
+      "${_pub_repo}" \
+      "${_pkg}" \
+      "${_publisher}" \
+      "${_key}" \
+      "${_platform}" \
+      "${_binary_pkgs[@]}"
+    )
+  fi
+}
+
+_repo_dir_setup() {
+  local \
+    _msg=() \
+    _tmp_dir
+  _tmp_dir="${_cache_dir}/repo"
+  _repo_dir="$( \
+    mktemp \
+      -d \
+      -p \
+        "${_tmp_dir}")"
+  _msg=(
+    "Setting up repository directory"
+    "'${_repo_dir}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  mkdir \
+    -p \
+    "${_repo_dir}"
+  chmod \
+    700 \
+    "${_repo_dir}"
+}
+
+_binary_packages_tmp_dir_setup() {
+  local \
+    _msg=() \
+    _tmp_dir
+  _tmp_dir="${_cache_dir}/binaries"
+  _binary_packages_tmp_dir="$( \
+    mktemp \
+      -u \
+      -d \
+      -p \
+        "${_tmp_dir}")"
+  _msg=(
+    "Setting up temporary"
+    "binary packages directory"
+    "'${_binary_packages_tmp_dir}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  mkdir \
+    -p \
+    "${_binary_packages_tmp_dir}"
+  chmod \
+    700 \
+    "${_binary_packages_tmp_dir}"
+}
+
+_pub_repo_setup() {
+  local \
+    _msg=() \
+    _tmp_dir
+  _tmp_dir="${_cache_dir}/publish"
+  _pub_repo="$( \
+    mktemp \
+      -u \
+      -d \
+      -p \
+        "${_tmp_dir}")"
+  _msg=(
+    "Setting up temporary"
+    "publication repository directory"
+    "'${_pub_repo}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  mkdir \
+    -p \
+    "${_pub_repo}"
+  chmod \
+    700 \
+    "${_pub_repo}"
+}
+
+_source_tmp_dir_setup() {
+  local \
+    _msg=() \
+    _tmp_dir
+  _tmp_dir="${_cache_dir}/source"
+  _source_tmp_dir="$( \
+    mktemp \
+      -u \
+      -d \
+      -p \
+        "${_tmp_dir}")"
+  _msg=(
+    "Setting up temporary"
+    "source package directory"
+    "'${_source_tmp_dir}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  mkdir \
+    -p \
+    "${_source_tmp_dir}"
+  chmod \
+    700 \
+    "${_source_tmp_dir}"
+}
+
+_source_prepare() {
+  local \
+    _source_repo="${1}" \
+    _pkg="${2}" \
+    _source_dir="${3}"
+  rsync \
+    -a \
+    "${_source_repo}/${_pkg}" \
+    "${_source_dir}"
+  if [[ -d "${_source_dir}/${_pkg}/.git" ]]; then
+    _msg=(
+      "Removing git repository data"
+      "directory '${_source_dir}/${_pkg}/.git'."
+    )
+    _msg_info \
+      "${_msg[*]}"
+    rm \
+      -rf \
+      "${_source_dir}/${_pkg}/.git"
+  fi
+}
+
+# $@: packages
+_pub() {
+  local \
+    _package_type="${1}" \
+    _ur_address="${2}" \
+    _ur_version="${3}" \
+    _up_address="${4}" \
+    _pp_address="${5}" \
+    _deployments_dir="${6}" \
+    _wallet_name="${7}" \
+    _wallet_path="${8}" \
+    _wallet_password="${9}" \
+    _wallet_seed="${10}" \
+    _target_network="${11}" \
+    _api_key_path="${12}" \
+    _cache_dir="${13}" \
+    _output_dir="${14}" \
+    _repo_dir="${15}" \
+    _origin="${16}" \
+    _publishing_platform="${17}" \
+    _target_publisher="${18}" \
+    _target_price="${19}" \
+    _measure_unit="${20}" \
+    _target_uri="${21}" \
+    _recipe_publish="${22}" \
+    _package_list="${23}" \
+    _gnupg_home="${24}" \
+    _key_fingerprint="${25}" \
+    _key_email="${26}" \
+    _platform="${27}" \
+    _packages=() \
+    _pkgs=() \
+    _get_opts=() \
+    _pub_opts=() \
+    _binary_pkgs=() \
+    _pkg \
+    _pub_repo \
+    _binary_packages_tmp_dir \
+    _source_tmp_dir \
+    _msg=() \
+    _oldpwd
+  shift \
+    27
+  _packages=(
+    "$@"
+  )
+  _oldpwd="$( \
+    pwd)"
+  if [[ "${_package_type}" == "source" && \
+        "${_publishing_platform}" == "fur" ]]; then
+    _msg=(
+      "The fur is a binary package publishing"
+      "platform."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+  if [[ "${_repo_dir}" == "" ]]; then
+    _repo_dir_setup
+  fi
+  _msg_info \
+    "Packages: ${_packages[*]}."
+  for _pkg \
+    in "${_packages[@]}"; do
+    _msg_info \
+      "Package '${_pkg}'."
+    _pub_repo_setup
+    if [[ "${_package_type}" == "binary" ]]; then
+      _binary_packages_tmp_dir_setup
+      _binary_packages_tmp_dir="$( \
+        mktemp \
+          -d)"
+      "_${_origin}_binary_package_get" \
+        "${_repo_dir}" \
+        "${_platform}" || \
+        echo \
+         "no get function for ${_origin}"
+      _get_opts=()
+      "_${_publishing_platform}_get" \
+        "${_pub_repo}" \
+        "${_platform}" || \
+        echo "hi"
+    elif [[ "${_package_type}" == "source" ]]; then
+      if [[ "${_origin}" == "lur" ]]; then
+        if [[ ! -d "${_repo_dir}/lur/${_pkg}" ]]; then
+          _msg=(
+            "found no sources for package"
+            "'${_pkg}' in repo '${_repo_dir}/lur'"
+          )
+          _msg_error \
+            "${_msg[*]}" \
+            1
+	else
+          _source_tmp_dir_setup
+	  _source_prepare \
+	    "${_repo_dir}/lur" \
+	    "${_pkg}" \
+	    "${_source_tmp_dir}"
+        fi
+      fi
+    fi
+    _pub_opts_setup
+    "_${_publishing_platform}_pub" \
+      "${_pub_opts[@]}"
+  done
+  cd \
+    "${_oldpwd}"
+}
+
+_key_latest_select() {
+  local \
+    _keyserver_receive_dir \
+    _find_opts=() \
+    _keys=() \
+    _keys_sorted=() \
+    _msg=()
+  _keyserver_receive_dir="${HOME}/.cache/evm-openpgp-keyserver/receive"
+  _msg=(
+    "Selecting latest published"
+    "publisher's wallet address key"
+    "retrieved from keyserver."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _msg=(
+    "looking for own signatures"
+    "in '${_keyserver_receive_dir}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _find_opts+=(
+    -type
+      "f"
+    -iname
+      "${wallet_address}.*.asc"
+    -print0
+  )
+  _msg=(
+    "running find with options"
+    "'${_find_opts[@]}'"
+  )
+  _msg_info \
+    "${_msg[*]}"
+  mapfile \
+    -d \
+    $'\0' \
+    _keys < \
+    <(find \
+        "${_keyserver_receive_dir}" \
+	"${_find_opts[@]}" 2>/dev/null || \
+      true)
+  _keys_sorted=( $( \
+    printf \
+      "%s\n" \
+      "${_keys[@]}" | \
+      sort \
+        -V)
+  )
+  if [[ "${_keys_sorted}" == "" ]]; then
+    _msg=(
+      "No keys in '${_keyserver_receive_dir}',"
+      "create a key with"
+      "'evm-gpg new <your_user_name> <your_full_name>',"
+      "publish it with"
+      "'evm-openpgp-keyserver-publish <your_wallet_address>'"
+      "and then run"
+      "'evm-openpgp-keyserver-receive <your_wallet_address>'."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+  _msg_info \
+    "selecting key '${_keys_sorted[-1]}'"
+  _fingerprint="$( \
+    gpg-key-info \
+      -o \
+        "fingerprint" \
+      "${_keys_sorted[-1]}")"
+}
+
+_key_git_select() {
+  local \
+    _msg=()
+  _msg=(
+    "using default git signing key"
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _fingerprint="$( \
+    git \
+      config \
+        --list | \
+      grep \
+        signingkey | \
+        awk \
+          -F \
+            "=" \
+          '{print $2}')"
+}
+
+_pgp_fingerprint_auto_detect() {
+  local \
+    _fingerprint
+  if [[ "${publishing_platform}" == "fur" ]]; then
+    _key_git_select
+  elif [[ "${publishing_platform}" == "ur" ]]; then
+    _key_latest_select
+  fi
+  _set_override \
+    "pgp" \
+    "fingerprint" \
+    "${_fingerprint}"
+}
+
+_pgp_email_auto_detect() {
+  local \
+    _email
+  if [[ "${publishing_platform}" == "ur" ]]; then
+    _email=""
+  elif [[ "${publishing_platform}" == "fur" ]]; then
+    _email="$( \
+      git \
+        config \
+          --list | \
+        grep \
+          email | \
+          awk \
+            -F \
+              "=" \
+            '{print $2}')"
+  fi
+  _set_override \
+    "pgp" \
+    "email" \
+    "${_email}"
+}
+
+_platform_auto_detect() {
+  local \
+    _platform="arch" \
+    _os
+  _os="$( \
+    uname \
+      -o)"
+  if [[ "${_os}" == "Android" ]] || \
+     [[ -v "TERMUX_VERSION" ]]; then
+    _platform="termux"
+  fi
+  echo \
+    "${_platform}"
+}
+
+_package_type_auto_detect() {
+  local \
+    _type
+  if [[ "${publishing_platform}" == "fur" ]]; then
+    _type="binary"
+  elif [[ "${publishing_platform}" == "ur" || \
+          "${publishing_platform}" == "gur"  ]]; then
+    _type="source"
+  fi
+  _set_override \
+    "package" \
+    "type" \
+    "${_type}"
+}
+
+# Set defaults and, if present, overrides
+# from arch-grub command line option parameters
+_set_overrides() {
+  local \
+    _msg=()
+  if [[ -v override_color ]]; then
+    color="${override_color}"
+  elif [[ -z "${color}" ]]; then
+    color="n"
+  fi
+  if [[ -v override_quiet ]]; then
+    quiet="${override_quiet}"
+  elif [[ -z "${quiet}" ]]; then
+    quiet="y"
+  fi
+  _set_override \
+    "publishing" \
+    "date" \
+    "$(_get_date_human)"
+  _set_override \
+    "wallet" \
+    "name" \
+    "default"
+  _set_override \
+    "user" \
+    "level" \
+    "n"
+  _deployments_dir_auto_detect \
+    "evm-contracts-source-index" \
+    "${user_level}"
+  _network_auto_detect \
+    "SourceIndex" \
+    "${deployments_dir}" \
+    "${user_level}"
+  _api_key_auto_detect \
+    "${target_network}"
+  _set_override \
+    "wallet" \
+    "path" \
+    "$(_wallet_path_get \
+         "evm-wallet" \
+         "${wallet_name}")"
+  _secret_auto_detect \
+    "seed" \
+    "seed" \
+    "evm-wallet" \
+    "${wallet_name}"
+  _secret_auto_detect \
+    "password" \
+    "plain" \
+    "evm-wallet" \
+    "${wallet_name}"
+  _set_override \
+    "wallet" \
+    "address" \
+    "$(evm-wallet \
+         get \
+	   "${wallet_name}" \
+           "address")"
+  _set_override \
+    "source" \
+    "uri" \
+    ""
+  _set_override \
+    "recipe" \
+    "publish" \
+    "y"
+  _contract_setup_auto_detect \
+    "evm-contracts-source-index" \
+    "SourceIndex" \
+    "si" \
+    "${target_network}" \
+    "${user_level}" \
+    "${deployments_dir}"
+  _set_override \
+    "cache" \
+    "dir" \
+    "$(_cache_dir_auto_detect)"
+  _set_override \
+    "gnupg" \
+    "home" \
+    "${HOME}/.config/evm-gnupg"
+  _pgp_email_auto_detect
+  _pgp_fingerprint_auto_detect
+}
+
+# Show help usage, with an exit status.
+# $1: exit status number.
+_usage() {
+  local \
+    _si \
+    _si_deployment \
+    _networks \
+    _usage_text
+  _si="SourceIndex"
+  _si_deployment="${deployments_dir}/${_si}"
+  _networks="$( \
+    evm-contract-deployment-networks \
+      -A \
+      "${_si_deployment}")"
+  local \
+    _usage_text
+  IFS='' \
+    read \
+      -r \
+      -d '' \
+      _usage_text << \
+        ENDUSAGETEXT || true
+
+EVM networks contracts' source index publisher tool.
+
+Usage:
+  ${app_name}
+    [options]
+    <target_contract>
+    <evm_version>
+    <solc_version>
+
+  networks:
+$(_display_networks \
+     "${_networks[*]}")
+
+  options:
+     -A <si_address>           Address of the 'Source Index'
+                               contract on the network.
+                               Default: ${si_address}
+     -V <si_version>           Version of the target 'Source Index'
+                               contract.
+                               Default: ${si_version}
+     -u                        Whether to retrieve publishers' contract
+                               address from user directory or custom
+                               deployment.
+                               Default: ${user_level}
+     -d <deployments_dir>      Contracts deployments directory.
+                               Default: ${deployments_dir}
+     -N <wallet_name>          Wallet name.
+                               Default: ${wallet_name}
+     -w <wallet_path>          Wallet path.
+                               Default: ${wallet_path}
+     -p <wallet_password>      Wallet password.
+                               Default: ${wallet_password}
+     -s <wallet_seed>          Wallet seed path.
+                               Default: ${wallet_seed}
+     -n <network>              EVM network name (${_networks[*]}).
+                               Default: ${target_network}
+     -k <api_key>              Etherscan-like service key.
+                               Default: ${api_key}
+     -U <source_uri>           To manually specify the signed
+                               contract's source archive evmfs URI
+                               and skip upload.
+                               Default: ${source_uri}
+     -S <y/n>                  If set to 'y', it will skip
+                               recipe publishing.
+                               Default: ${source_publish}
+     -H <gnupg_home>           GNUPG home directory.
+                               Default: ${gnupg_home}
+     -K <fingerprint>          OpenPGP signature key.
+                               Default: ${pgp_fingerprint}
+     -E <email_like_id>        OpenPGP signature email.
+                               Default: ${pgp_email}
+
+     -c                        Colors.
+     -h                        This message.
+     -v                        Enable verbose output
+ENDUSAGETEXT
+  _printf \
+    '%s\n' \
+    "${_usage_text}"
+  exit \
+    "${1}"
+}
+
+# Shows configuration options.
+_show_config() {
+  _msg_info "${app_name} configuration"
+  _msg_info "            Publishing date:   ${publishing_date}"
+  _msg_info "       Source Index address:   ${si_address}"
+  _msg_info "       Source Index version:   ${si_version}"
+  _msg_info "                 User level:   ${user_level}"
+  _msg_info "      Deployments directory:   ${deployments_dir}"
+  _msg_info "             Wallet address:   ${wallet_address}"
+  _msg_info "                Wallet name:   ${wallet_name}"
+  _msg_info "                Wallet path:   ${wallet_path}"
+  _msg_info "            Wallet password:   ${wallet_password}"
+  _msg_info "                Wallet seed:   ${wallet_seed}"
+  _msg_info "             Target network:   ${target_network}"
+  _msg_info "                    API key:   ${api_key}"
+  _msg_info "            Cache directory:   ${cache_dir}"
+  _msg_info "            GNUPG directory:   ${gnupg_home}"
+  _msg_info "              Signature key:   ${pgp_fingerprint}"
+  _msg_info "            Signature email:   ${pgp_email}"
+  _msg_info "          Target source URI:   ${source_uri}"
+  _msg_info "             Source publish:   ${source_publish}"
+  _msg_info "            Target contract:   ${target_contract}"
+  _msg_info "         Target EVM version:   ${evm_version}"
+  _msg_info "        Target Solc version:   ${solc_version}"
+}
+
+_globals
+_global_variables
+_requirements
+# shellcheck disable=SC2004
+# shellcheck disable=SC2034
+while \
+  getopts \
+    'A:V:ud:N:w:p:s:n:k:W:S:cvh?' \
+    arg; do
+  case \
+    "${arg}" in
+    A) override_si_address="${OPTARG}" ;;
+    V) override_si_version="${OPTARG}" ;;
+    u) override_user_level="y" ;;
+    d) override_deployments_dir="${OPTARG}" ;;
+    N) override_wallet_name="${OPTARG}" ;;
+    w) override_wallet_path="${OPTARG}" ;;
+    p) override_wallet_password="${OPTARG}" ;;
+    s) override_wallet_seed="${OPTARG}" ;;
+    n) override_target_network="${OPTARG}" ;;
+    k) override_api_key="${OPTARG}" ;;
+    W) override_cache_dir="${OPTARG}" ;;
+    S) override_source_publish="${OPTARG}" ;;
+    c) override_color="y" ;;
+    v) override_quiet="n" ;;
+    h|?) _set_overrides && \
+	 _usage \
+           0 ;;
+    *)
+    _msg_error \
+      "Invalid argument '${arg}'." \
+      0 && \
+    _set_overrides && \
+    _usage \
+      1
+    ;;
+  esac
+done
+shift \
+  $(( \
+    OPTIND - 1 \
+  ))
+if (( $# < 1 )); then
+  _msg_error \
+    "No contract given." \
+    0
+  _set_overrides
+  _usage \
+    1
+fi
+if (( $# < 2 )); then
+  _msg_error \
+    "No EVM version given." \
+    0
+  _set_overrides
+  _usage \
+    1
+fi
+if (( $# < 3 )); then
+  _msg_error \
+    "No Solc version given." \
+    0
+  _set_overrides
+  _usage \
+    1
+fi
+target_contract="${1}"
+evm_version="${2}"
+solc_version="${3}"
+_config_user_init \
+  "${app_name}"
+_set_overrides
+_show_config
+app_opts=(
+  "${si_address}"
+  "${si_version}"
+  "${deployments_dir}"
+  "${wallet_name}"
+  "${wallet_path}"
+  "${wallet_password}"
+  "${wallet_seed}"
+  "${target_network}"
+  "${api_key}"
+  "${cache_dir}"
+  "${contract_address}"
+  "${evm_version}"
+  "${solc_version}"
+  "${target_contract}"
+)
+_evm_contract_source_publish \
+  "${app_opts[@]}"
