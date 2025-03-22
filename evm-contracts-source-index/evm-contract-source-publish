@@ -1135,6 +1135,7 @@ EVM networks contracts' source index publisher tool.
 Usage:
   ${app_name}
     [options]
+    <contract_network>
     <contract_address>
     <contract_source>
     <evm_version>
@@ -1215,6 +1216,7 @@ _show_config() {
   _msg_info "            Signature email:   ${pgp_email}"
   _msg_info "          Target source URI:   ${source_uri}"
   _msg_info "             Source publish:   ${source_publish}"
+  _msg_info "           Contract network:   ${contract_network}"
   _msg_info "           Contract address:   ${contract_address}"
   _msg_info "            Target contract:   ${contract_source}"
   _msg_info "         Target EVM version:   ${evm_version}"
