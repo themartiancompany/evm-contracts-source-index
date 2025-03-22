@@ -97,7 +97,12 @@ _global_variables() {
   api_key=""
   cache_dir=""
   gnupg_home=""
-  target_contract=""
+  pgp_fingerprint=""
+  pgp_email=""
+  source_uri=""
+  source_publish=""
+  contract_address=""
+  contract_source=""
   evm_version=""
   solc_version=""
   color=""
@@ -122,15 +127,15 @@ _cache_dir_auto_detect() {
 
 _contract_sign() {
   local \
-    _source_repo="${1}" \
-    _pkg="${2}" \
+    _dir="${1}" \
+    _contract_name="${2}" \
     _gnupg_home="${3}" \
     _key_fingerprint="${4}" \
     _gpg_opts=() \
     _msg=()
   _msg=(
-    "Signing source recipe repo"
-    "archive '${_source_repo}/${_pkg}.tar.xz'."
+    "Signing source contract"
+    "archive '${_dir}/${_contract_name}.tar.xz'."
   )
   _msg_info \
     "${_msg[*]}"
@@ -141,50 +146,50 @@ _contract_sign() {
       "${_key_fingerprint}"
     --sign
     --output
-      "${_source_repo}/${_pkg}.tar.xz.gpg"
+      "${_dir}/${_contract_name}.tar.xz.gpg"
   )
   if [[ "${quiet}" == "n" ]]; then
     _msg=(
-      "Source recipe repo"
+      "Source contract directory"
       "contents:"
     )
     _msg_info \
       "${_msg[*]}"
     tree \
-      "${_source_repo}"
+      "${_dir}"
   fi
   gpg \
     "${_gpg_opts[@]}" \
-    "${_source_repo}/${_pkg}.tar.xz"
+    "${_dir}/${_contract_name}.tar.xz"
 }
 
 _contract_compress() {
   local \
-    _source_dir="${1}" \
-    _pkg="${2}" \
+    _dir="${1}" \
+    _contract_name="${2}" \
     _msg=()
   _msg=(
     "Compressing source recipe"
-    "repository for package"
-    "'${_pkg}'."
+    "repository for contract"
+    "'${_contract_name}'."
   )
   _msg_info \
     "${_msg[*]}"
   XZ_OPT="-e9" \
   tar \
     --transform \
-      "s%^${_source_dir#/}/${_pkg}%${_pkg}%" \
+      "s%^${_dir#/}/${_contract_name}%${_contract_name}%" \
     --create \
     --file \
-      "${_source_dir}/${_pkg}.tar.xz" \
+      "${_dir}/${_contract_name}.tar.xz" \
     --xz \
-    "${_source_dir}/${_pkg}"
+    "${_dir}/${_contract_name}"
 }
 
 _contract_upload() {
   local \
     _source_dir="${1}" \
-    _pkg="${2}" \
+    _contract_name="${2}" \
     _wallet_name="${3}" \
     _wallet_path="${4}" \
     _wallet_password="${5}" \
@@ -195,10 +200,10 @@ _contract_upload() {
     _evmfs_uri_opts=() \
     _msg=()
   _msg=(
-    "Uploading source recipe"
-    "repository signed archive"
-    "'${_source_dir}/${_pkg}.tar.xz.gpg'"
-    "for package '${_pkg}' to the EVMFS."
+    "Uploading contract's source"
+    "signed archive"
+    "'${_source_dir}/${_contract_name}.tar.xz.gpg'"
+    "for contract '${_contract_name}' to the EVMFS."
   )
   _msg_info \
     "${_msg[*]}"
@@ -217,7 +222,7 @@ _contract_upload() {
       -k
         "${_api_key_path}"
       -m
-        "standalone"
+        "bulk"
     )
   else
     _evmfs_opts+=(
@@ -237,20 +242,20 @@ _contract_upload() {
   evmfs \
     "${_evmfs_opts[@]}" \
     publish \
-      "${_source_dir}/${_pkg}.tar.xz.gpg"
+      "${_source_dir}/${_contract_name}.tar.xz.gpg"
   _msg=(
-    "Getting uploaded source recipe"
-    "repository signed archive"
-    "'${_source_dir}/${_pkg}.tar.xz.gpg'"
+    "Getting uploaded contract's source"
+    "signed archive"
+    "'${_source_dir}/${_contract_name}.tar.xz.gpg'"
     "EVMFS uri."
   )
   _msg_info \
     "${_msg[*]}"
-  _target_uri="$( \
+  _source_uri="$( \
     evmfs \
       "${_evmfs_uri_opts[@]}" \
       publish \
-        "${_source_dir}/${_pkg}.tar.xz.gpg")"
+        "${_source_dir}/${_contract_name}.tar.xz.gpg")"
 }
 
 _contract_call_opts_setup() {
@@ -327,28 +332,23 @@ _publisher_check_call_opts_setup() {
   )
 }
 
-_ether_to_wei() {
-  local \
-    _ether="${1}" \
-    _unit
-  _scale=1000000000000000000
-  echo \
-    "$((_ether * _scale))"
-}
-
 _evmfs_uri_check() {
   local \
     _uri="${1}" \
     _msg=()
   if [[ "${_uri}" != "evmfs://"* ]]; then
     _msg=(
-      "Signed package recipe archive"
+      "Signed contract's source archive"
       "URI must be an EVMFS uri."
     )
     _msg_error \
       "${_msg[*]}" \
       1
   fi
+}
+
+_contract_prepare() {
+
 }
 
 _evm_contract_source_publish() {
@@ -365,9 +365,9 @@ _evm_contract_source_publish() {
     _cache_dir="${10}" \
     _source_publish="${11}" \
     _contract_address="${12}" \
-    _evm_version="${13}" \
-    _solc_version="${14}" \
-    _target_contract="${15}" \
+    _target_contract="${13}" \
+    _evm_version="${14}" \
+    _solc_version="${15}" \
     _msg=() \
     _si_abi \
     _si_bytecode \
@@ -388,16 +388,17 @@ _evm_contract_source_publish() {
     "${_si_version}"
   if [[ "${_source_publish}" == "n" ]]; then
     _msg=(
-      "Skipping recipe publishing."
+      "Skipping contract's source publishing."
     )
     _msg_info \
       "${_msg[*]}"
   elif [[ "${_recipe_publish}" == "y" ]]; then
     if [[ "${_target_uri}" == "" ]]; then
-      _ur_compress \
+      _contract_prepare
+      _contract_compress \
         "${_work_dir}" \
         "${_package}"
-      _ur_sign \
+      _contract_sign \
         "${_work_dir}" \
         "${_package}" \
         "${_gnupg_home}" \
@@ -1063,7 +1064,7 @@ _set_overrides() {
     "uri" \
     ""
   _set_override \
-    "recipe" \
+    "source" \
     "publish" \
     "y"
   _contract_setup_auto_detect \
@@ -1113,7 +1114,8 @@ EVM networks contracts' source index publisher tool.
 Usage:
   ${app_name}
     [options]
-    <target_contract>
+    <contract_address>
+    <contract_source>
     <evm_version>
     <solc_version>
 
@@ -1192,7 +1194,8 @@ _show_config() {
   _msg_info "            Signature email:   ${pgp_email}"
   _msg_info "          Target source URI:   ${source_uri}"
   _msg_info "             Source publish:   ${source_publish}"
-  _msg_info "            Target contract:   ${target_contract}"
+  _msg_info "           Contract address:   ${contract_address}"
+  _msg_info "            Target contract:   ${contract_source}"
   _msg_info "         Target EVM version:   ${evm_version}"
   _msg_info "        Target Solc version:   ${solc_version}"
 }
@@ -1204,7 +1207,7 @@ _requirements
 # shellcheck disable=SC2034
 while \
   getopts \
-    'A:V:ud:N:w:p:s:n:k:W:S:cvh?' \
+    'A:V:ud:N:w:p:s:n:k:W:S:H:K:E:cvh?' \
     arg; do
   case \
     "${arg}" in
@@ -1219,7 +1222,11 @@ while \
     n) override_target_network="${OPTARG}" ;;
     k) override_api_key="${OPTARG}" ;;
     W) override_cache_dir="${OPTARG}" ;;
+    U) override_source_uri="${OPTARG}" ;;
     S) override_source_publish="${OPTARG}" ;;
+    H) override_gnupg_home="${OPTARG}" ;;
+    K) override_pgp_fingerprint="${OPTARG}" ;;
+    E) override_pgp_email="${OPTARG}" ;;
     c) override_color="y" ;;
     v) override_quiet="n" ;;
     h|?) _set_overrides && \
@@ -1241,7 +1248,7 @@ shift \
   ))
 if (( $# < 1 )); then
   _msg_error \
-    "No contract given." \
+    "No contract address given." \
     0
   _set_overrides
   _usage \
@@ -1249,7 +1256,7 @@ if (( $# < 1 )); then
 fi
 if (( $# < 2 )); then
   _msg_error \
-    "No EVM version given." \
+    "No contract source given." \
     0
   _set_overrides
   _usage \
@@ -1257,15 +1264,24 @@ if (( $# < 2 )); then
 fi
 if (( $# < 3 )); then
   _msg_error \
+    "No EVM version given." \
+    0
+  _set_overrides
+  _usage \
+    1
+fi
+if (( $# < 4 )); then
+  _msg_error \
     "No Solc version given." \
     0
   _set_overrides
   _usage \
     1
 fi
-target_contract="${1}"
-evm_version="${2}"
-solc_version="${3}"
+contract_address="${1}"
+target_contract="${2}"
+evm_version="${3}"
+solc_version="${4}"
 _config_user_init \
   "${app_name}"
 _set_overrides
@@ -1282,9 +1298,9 @@ app_opts=(
   "${api_key}"
   "${cache_dir}"
   "${contract_address}"
+  "${contract_source}"
   "${evm_version}"
   "${solc_version}"
-  "${target_contract}"
 )
 _evm_contract_source_publish \
   "${app_opts[@]}"
