@@ -348,7 +348,25 @@ _evmfs_uri_check() {
 }
 
 _contract_prepare() {
-
+  local \
+    _msg=()
+  if [[ ! -e "${_contract_source}" ]]; then
+    _msg=(
+      "Contract source"
+      "'${_contract_source}'"
+      "not found."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+  mkdir \
+    -p \
+    "${_contract_dir}"
+  cp \
+    -r \
+    "${_contract_source}" \
+    "${_contract_dir}"
 }
 
 _evm_contract_source_publish() {
@@ -364,15 +382,18 @@ _evm_contract_source_publish() {
     _api_key_path="${9}" \
     _cache_dir="${10}" \
     _source_publish="${11}" \
-    _contract_address="${12}" \
-    _target_contract="${13}" \
-    _evm_version="${14}" \
-    _solc_version="${15}" \
+    _contract_network="${12}" \
+    _contract_address="${13}" \
+    _target_contract="${14}" \
+    _evm_version="${15}" \
+    _solc_version="${16}" \
     _msg=() \
+    _contract_dir \
     _si_abi \
     _si_bytecode \
     _si_compiler_output \
     _publish_call_opts=()
+  _contract_dir="${_cache_dir}/${_contract_network}/${_contract_address}"
   _msg=(
     "Publishing source for"
     "contract '${_target_contract}'"
@@ -1248,7 +1269,15 @@ shift \
   ))
 if (( $# < 1 )); then
   _msg_error \
-    "No contract address given." \
+    "No contract network specified." \
+    0
+  _set_overrides
+  _usage \
+    1
+fi
+if (( $# < 1 )); then
+  _msg_error \
+    "No contract network specified." \
     0
   _set_overrides
   _usage \
@@ -1256,7 +1285,7 @@ if (( $# < 1 )); then
 fi
 if (( $# < 2 )); then
   _msg_error \
-    "No contract source given." \
+    "No contract address specified." \
     0
   _set_overrides
   _usage \
@@ -1264,7 +1293,7 @@ if (( $# < 2 )); then
 fi
 if (( $# < 3 )); then
   _msg_error \
-    "No EVM version given." \
+    "No contract source given." \
     0
   _set_overrides
   _usage \
@@ -1272,16 +1301,25 @@ if (( $# < 3 )); then
 fi
 if (( $# < 4 )); then
   _msg_error \
-    "No Solc version given." \
+    "No EVM version specified." \
     0
   _set_overrides
   _usage \
     1
 fi
-contract_address="${1}"
-target_contract="${2}"
-evm_version="${3}"
-solc_version="${4}"
+if (( $# < 5 )); then
+  _msg_error \
+    "No Solc version specified." \
+    0
+  _set_overrides
+  _usage \
+    1
+fi
+contract_network="${1}"
+contract_address="${2}"
+target_contract="${3}"
+evm_version="${4}"
+solc_version="${5}"
 _config_user_init \
   "${app_name}"
 _set_overrides
