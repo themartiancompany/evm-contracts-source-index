@@ -69,9 +69,28 @@ and the
   https://github.com/themartiancompany/crash-bash)
 libraries.
 
+### Installation
+
+The program can be installed with a simple
+
+```bash
+make
+make \
+  install
+```
+
+Being the program written using the EVM Toolchain,
+the build procedure requires
+[EVM Make](
+  https://github.com/themartiancompany/evm-make)
+and
+[Solidity Compiler](
+  https://github.com/themartiancompany/solidity-compiler)
+to be installed and available on the system.
+
 ### Usage
 
-To upload the source code the source code for
+To upload the source code for
 a contract one can type
 
 ```bash
@@ -91,21 +110,23 @@ type
 ```bash
 evm-contracts-source-index-get \
   -t \
-    <output_type> \
+    'source' \
   <contract_network> \
   <contract_address>
 ```
 
-where `<output_type>` can be one between
+parameters for the `-t` output type option are
 `source`, `evm_version`, `compiler`,
 `compiler_version`.
 
 For further information and options consult
-the manual
+the manuals
 
 ```bash
 man \
-  evm-contracts-source-index-publish
+  evm-contract-source-publish
+man \
+  evm-contract-source-get
 ```
 
 or run the commands with the `-h` help option.
