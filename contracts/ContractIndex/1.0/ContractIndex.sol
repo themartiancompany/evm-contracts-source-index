@@ -143,6 +143,59 @@ contract ContractIndex {
     }
 
     /**
+     * @dev Publishes all data for a contract with a single call.
+     * @param _publisher User publishing the contract.
+     * @param _chainId ID of the blockchain for which
+     *                 the contract address is provided.
+     * @param _contractAddress Address of the contract for
+     *                         which the source is provided.
+     * @param _source Ethereum Virtual Machine File System
+     *                link to the source code of the contract.
+     * @param _evmVersion Ethereum Virtual Machine version
+     *                    for which the contract has been built.
+     * @param _compiler Compiler which has been used
+     *                  to build the source code.
+     * @param _compilerVersion Compiler used to build the contract.
+     */
+    function publish(
+      address _publisher,
+      uint256 _chainId,
+      address _contractAddress,
+      string memory _source,
+      string memory _evmVersion,
+      string memory _compiler,
+      string memory _compilerVersion) public {
+      checkOwner(
+        _publisher);
+      checkUnlocked(
+        _publisher,
+        _chainId,
+        _contractAddress);
+      checkUri(
+        _source);
+      source[
+        _publisher][
+          _chainId][
+            _contractAddress] =
+        _source;
+      evmVersion[
+        _publisher][
+          _chainId][
+            _contractAddress] =
+        _evmVersion;
+      compiler[
+        _publisher][
+          _chainId][
+            _contractAddress] =
+        _compiler;
+      compilerVersion[
+        _publisher][
+          _chainId][
+            _contractAddress] =
+        _compilerVersion;  
+    }
+
+    /**
      * @dev Publishes source code for a contract.
      * @param _publisher User publishing the contract.
      * @param _chainId ID of the blockchain for which
@@ -152,7 +205,7 @@ contract ContractIndex {
      * @param _source Ethereum Virtual Machine File System
      *                link to the source code of the contract.
      */
-    function postSource(
+    function publishSource(
       address _publisher,
       uint256 _chainId,
       address _contractAddress,
@@ -182,7 +235,7 @@ contract ContractIndex {
      * @param _evmVersion Ethereum Virtual Machine version
      *                    for which the contract has been built.
      */
-    function postEvmVersion(
+    function publishEvmVersion(
       address _publisher,
       uint256 _chainId,
       address _contractAddress,
@@ -210,7 +263,7 @@ contract ContractIndex {
      * @param _compiler Compiler which has been used
      *                  to build the source code.
      */
-    function postCompiler(
+    function publishCompiler(
       address _publisher,
       uint256 _chainId,
       address _contractAddress,
@@ -237,7 +290,7 @@ contract ContractIndex {
      *                         for which the source is provided.
      * @param _compilerVersion Compiler used to build the contract.
      */
-    function postCompilerVersion(
+    function publishCompilerVersion(
       address _publisher,
       uint256 _chainId,
       address _contractAddress,
