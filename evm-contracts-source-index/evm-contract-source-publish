@@ -62,8 +62,6 @@ _requirements() {
     'libevm'
   libevm-requirements
   _check_cmd \
-    'rsync'
-  _check_cmd \
     'tar'
   _zlib="$( \
     find \
@@ -496,11 +494,14 @@ _evm_contract_source_publish() {
     evm-contract-call \
       "${_publish_call_opts[@]}" \
       "${_si_address}" \
-      "publishRecipe" \
-      "${_package}" \
+      "publish" \
       "${_target_publisher}" \
-      "${_target_price}" \
-      "${_target_uri}"
+      "${_contract_network}" \
+      "${_contract_address}" \
+      "${_source_uri}" \
+      "${_evm_version}" \
+      "${_target_compiler}" \
+      "${_compiler_version}"
     _msg=(
       "Source for contract"
       "'${_contract_name}'"
@@ -809,7 +810,7 @@ _usage() {
       _usage_text << \
         ENDUSAGETEXT || true
 
-EVM networks contracts' source index publisher tool.
+EVM networks contracts' source index publishing tool.
 
 Usage:
   ${app_name}
