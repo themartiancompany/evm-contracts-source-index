@@ -54,6 +54,14 @@ Ethereum Virtual Machine File System
 so to guarantee source code persistence,
 undeletability and neutrality.
 
+Before uploading, source code is compressed and signed
+against deployers or users' EVM GNU Privacy Guard
+keys published on the EVM OpenPGP Key Server
+so to avoid users from potentially
+malevolent RPC endpoints and
+man-in-the-middle attacks.
+
+
 Networks
 ========
 
@@ -107,6 +115,7 @@ Copyright Pellegrino Prevete. AGPL-3.0.
 See also
 ========
 
+* evm-openpgp-key-publish
 * evm-deployer
 * evmfs
 * evm-wallet

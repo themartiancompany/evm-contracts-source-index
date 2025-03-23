@@ -20,9 +20,10 @@
 [comment]: <> (If not, see <https://www.gnu.org/licenses/>.)
 
 
-# EVM Smart Contracts Source Index
+# Ethereum Virtual Machine (EVM) Smart Contracts Source Index
 
-The EVM Smart Contracts Source Index
+The Ethereum Virtual Machine (EVM)
+Smart Contracts Source Index
 is a decentralized, undeletable, uncensorable,
 network-neutral and network-indipendent Ethereum
 Virtual Machine (EVM) compatible networks' smart
@@ -34,7 +35,7 @@ It integrates with the
 and leverages the
 [Ethereum Virtual Machine File System](
   https://github.com/themartiancompany/evmfs)
-to host contracts' source code directly
+(EVMFS) to host contracts' source code directly
 on-chain.
 
 It is a free (as in freedom) neutral,
@@ -44,6 +45,17 @@ networks explorers contracts source code
 verification systems, which have become
 de facto a bottleneck and a security
 vulnerability for EVM networks.
+
+Before uploading, source code is compressed and signed
+against deployers or users' 
+[EVM GNU Privacy Guard](
+  https://github.com/themartiancompany/evm-gnupg)
+keys published on the
+[EVM OpenPGP Key Server](
+  https://github.com/themartiancompany/evm-openpgp-keyserver),
+so to avoid users from potentially
+malevolent RPC endpoints and
+man-in-the-middle attacks.
 
 It depends on the
 [EVM Contracts Tools](
