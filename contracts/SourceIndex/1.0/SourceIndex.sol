@@ -22,11 +22,11 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 /**
- * @title Contract Index
+ * @title Source Index
  * @dev On-chain index for smart contracts'
  *      source code. 
  */
-contract ContractIndex {
+contract SourceIndex {
 
     address public immutable deployer = 0xea02F564664A477286B93712829180be4764fAe2;
     string public hijess = "marryme";
@@ -315,7 +315,7 @@ contract ContractIndex {
      * @param _contractAddress Address of the contract
      *                         the source code is to lock.
      */
-    function lockContract(
+    function lockSource(
       address _publisher,
       uint256 _chainId,
       address _contractAddress)
