@@ -13,5 +13,5 @@ evm_version=(
   ["1.0"]="cancun"
 )
 contract_address=(
-  ["1.0"]=""
+  ["1.0"]="0xF8f89402cD672cA40e01Cc80e6838b81Ef0145C0"
 )
