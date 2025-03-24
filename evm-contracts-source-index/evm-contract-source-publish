@@ -373,6 +373,8 @@ _source_locked_check() {
     "on network '${_contract_network}'"
     "by publisher '${_target_publisher}'."
   )
+  _msg_info \
+    "${_msg[*]}"
   _source_locked_call_opts_setup \
     "${_si_abi}" \
     "${_si_bytecode}" \
@@ -392,6 +394,20 @@ _source_locked_check() {
       "on network '${_contract_network}'"
       "by publisher '${_target_publisher}'"
       "already locked."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  elif [[ "${_locked}" == "false" ]]; then
+    _msg=(
+      "Contract unlocked, publishing."
+    )
+    _msg_info \
+      "${_msg[*]}"
+  else
+    _msg=(
+      "Unknown error retrieving contract's"
+      "source lock status."
     )
     _msg_error \
       "${_msg[*]}" \
