@@ -402,15 +402,16 @@ _evm_contract_source_publish() {
     _target_network="${8}" \
     _api_key_path="${9}" \
     _target_publisher="${10}" \
-    _cache_dir="${11}" \
-    _source_uri="${12}" \
-    _source_publish="${13}" \
-    _contract_network="${14}" \
-    _contract_address="${15}" \
-    _contract_source="${16}" \
-    _evm_version="${17}" \
-    _target_compiler="${18}" \
-    _compiler_version="${19}" \
+    _gnupg_home="${11}" \
+    _cache_dir="${12}" \
+    _source_uri="${13}" \
+    _source_publish="${14}" \
+    _contract_network="${15}" \
+    _contract_address="${16}" \
+    _contract_source="${17}" \
+    _evm_version="${18}" \
+    _target_compiler="${19}" \
+    _compiler_version="${20}" \
     _msg=() \
     _contract_dir \
     _contract_name \
@@ -751,6 +752,10 @@ _set_overrides() {
     "gnupg" \
     "home" \
     "${HOME}/.config/evm-gnupg"
+  _set_override \
+    "gnupg" \
+    "home" \
+    "${HOME}/.config/evm-gnupg"
   _pgp_fingerprint_auto_detect
   _pgp_email_auto_detect
 }
@@ -1002,6 +1007,7 @@ app_opts=(
   "${target_network}"
   "${api_key}"
   "${target_publisher}"
+  "${gnupg_home}"
   "${cache_dir}"
   "${source_uri}"
   "${source_publish}"
