@@ -788,7 +788,7 @@ Usage:
 
   networks:
 $(_display_networks \
-     "${_networks[*]}")
+     "${_networks[@]}")
 
   options:
      -A <si_address>           Address of the 'Source Index'
