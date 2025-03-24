@@ -367,6 +367,12 @@ _source_locked_check() {
     _source_locked_call_opts=() \
     _locked \
     _msg=()
+  _msg=(
+    "Checking lock status for"
+    "contract '${_contract_address}'"
+    "on network '${_contract_network}'"
+    "by publisher '${_target_publisher}'."
+  )
   _source_locked_call_opts_setup \
     "${_si_abi}" \
     "${_si_bytecode}" \
@@ -377,7 +383,7 @@ _source_locked_check() {
       "${_si_address}" \
       "lock" \
       "${_target_publisher}" \
-      "${_contract_network}"
+      "${_contract_network}" \
       "${_contract_address}")"
   if [[ "${_locked}" == "true" ]]; then
     _msg=(
