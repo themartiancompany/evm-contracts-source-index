@@ -185,11 +185,11 @@ install-man:
 	  -vdm755 \
 	  "$(MAN_DIR)/man1"
 	rst2man \
-	  "man/evm-contracts-source-publish.1.rst" \
-	  "$(MAN_DIR)/man1/evm-contracts-source-publish.1"
+	  "man/evm-contract-source-publish.1.rst" \
+	  "$(MAN_DIR)/man1/evm-contract-source-publish.1"
 	rst2man \
-	  "man/evm-contracts-source-get.1.rst" \
-	  "$(MAN_DIR)/man1/evm-contracts-source-get.1"
+	  "man/evm-contract-source-get.1.rst" \
+	  "$(MAN_DIR)/man1/evm-contract-source-get.1"
 
 install-scripts:
 
