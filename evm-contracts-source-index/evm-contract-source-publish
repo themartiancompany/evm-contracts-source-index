@@ -760,10 +760,11 @@ _usage() {
     _usage_text
   _si="SourceIndex"
   _si_deployment="${deployments_dir}/${_si}"
-  _networks="$( \
+  _networks=( $( \
     evm-contract-deployment-networks \
       -A \
-      "${_si_deployment}")"
+      "${_si_deployment}")
+  )
   local \
     _usage_text
   IFS='' \
