@@ -27,7 +27,7 @@ evm-contract-source-get
 
 --------------------------------------------------------------------------------
 Ethereum Virtual Machine (EVM) smart contracts Source Index retrieval tool
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 :Version: evm-contract-source-get |version|
 :Manual section: 1
 

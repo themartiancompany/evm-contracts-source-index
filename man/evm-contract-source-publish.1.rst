@@ -27,7 +27,7 @@ evm-contract-source-publish
 
 --------------------------------------------------------------------------------
 Ethereum Virtual Machine (EVM) smart contracts source index publishing tool
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 :Version: evm-contract-source-publish |version|
 :Manual section: 1
 
