@@ -608,6 +608,11 @@ _key_latest_select() {
       -o \
         "fingerprint" \
       "${_keys_sorted[-1]}")"
+  _email="$( \
+    gpg-key-info \
+      -o \
+        "email" \
+      "${_keys_sorted[-1]}")"
 }
 
 _pgp_fingerprint_auto_detect() {
@@ -623,7 +628,7 @@ _pgp_fingerprint_auto_detect() {
 _pgp_email_auto_detect() {
   local \
     _email
-  _email=""
+  _key_latest_select
   _set_override \
     "pgp" \
     "email" \
@@ -746,8 +751,8 @@ _set_overrides() {
     "gnupg" \
     "home" \
     "${HOME}/.config/evm-gnupg"
-  _pgp_email_auto_detect
   _pgp_fingerprint_auto_detect
+  _pgp_email_auto_detect
 }
 
 # Show help usage, with an exit status.
@@ -978,7 +983,7 @@ if (( $# < 6 )); then
 fi
 contract_network="${1}"
 contract_address="${2}"
-target_contract="${3}"
+contract_source="${3}"
 evm_version="${4}"
 target_compiler="${5}"
 compiler_version="${6}"
