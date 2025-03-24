@@ -460,6 +460,10 @@ _evm_contract_source_publish() {
     "SourceIndex" \
     "_si" \
     "${_si_version}"
+  _publish_call_opts_setup \
+    "${_si_abi}" \
+    "${_si_bytecode}" \
+    "${_si_compiler_output}"
   if [[ "${_source_publish}" == "n" ]]; then
     _msg=(
       "Skipping contract's source publishing."
@@ -498,10 +502,6 @@ _evm_contract_source_publish() {
         "${_source_uri}"
     fi
     _source_locked_check
-    _publish_call_opts_setup \
-      "${_si_abi}" \
-      "${_si_bytecode}" \
-      "${_si_compiler_output}"
     _msg=(
       "Publisher"
       "'${_target_publisher}' posting"
