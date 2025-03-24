@@ -403,15 +403,16 @@ _evm_contract_source_publish() {
     _api_key_path="${9}" \
     _target_publisher="${10}" \
     _gnupg_home="${11}" \
-    _cache_dir="${12}" \
-    _source_uri="${13}" \
-    _source_publish="${14}" \
-    _contract_network="${15}" \
-    _contract_address="${16}" \
-    _contract_source="${17}" \
-    _evm_version="${18}" \
-    _target_compiler="${19}" \
-    _compiler_version="${20}" \
+    _key_fingerprint="${12}" \
+    _cache_dir="${13}" \
+    _source_uri="${14}" \
+    _source_publish="${15}" \
+    _contract_network="${16}" \
+    _contract_address="${17}" \
+    _contract_source="${18}" \
+    _evm_version="${19}" \
+    _target_compiler="${20}" \
+    _compiler_version="${21}" \
     _msg=() \
     _contract_dir \
     _contract_name \
@@ -1008,6 +1009,7 @@ app_opts=(
   "${api_key}"
   "${target_publisher}"
   "${gnupg_home}"
+  "${pgp_fingerprint}"
   "${cache_dir}"
   "${source_uri}"
   "${source_publish}"
