@@ -537,6 +537,26 @@ _evm_contract_source_publish() {
     _msg_info \
       "${_msg[*]}"
   fi
+  _msg=(
+    "Locking source for contract"
+    "at address '${_contract_address}'"
+    "on network '${_contract_network}'"
+    "for publisher '${_target_publisher}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  evm-contract-call \
+    "${_publish_call_opts[@]}" \
+    "${_si_address}" \
+    "lockSource" \
+    "${_target_publisher}" \
+    "${_contract_network}" \
+    "${_contract_address}"
+  _msg=(
+    "Contract's source correctly locked."
+  )
+  _msg_info \
+    "${_msg[*]}"
 }
 
 _work_dir_setup() {
@@ -859,7 +879,7 @@ $(_display_networks \
                                and skip upload.
                                Default: ${source_uri}
      -S <y/n>                  If set to 'y', it will skip
-                               recipe publishing.
+                               source publishing.
                                Default: ${source_publish}
      -H <gnupg_home>           GNUPG home directory.
                                Default: ${gnupg_home}
