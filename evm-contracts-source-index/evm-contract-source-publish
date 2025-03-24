@@ -554,7 +554,7 @@ _key_latest_select() {
   _msg_info \
     "${_msg[*]}"
   _msg=(
-    "looking for own signatures"
+    "Looking for own signatures"
     "in '${_keyserver_receive_dir}'."
   )
   _msg_info \
@@ -567,8 +567,8 @@ _key_latest_select() {
     -print0
   )
   _msg=(
-    "running find with options"
-    "'${_find_opts[@]}'"
+    "Running find with options"
+    "'${_find_opts[@]}'."
   )
   _msg_info \
     "${_msg[*]}"
@@ -602,7 +602,7 @@ _key_latest_select() {
       1
   fi
   _msg_info \
-    "selecting key '${_keys_sorted[-1]}'"
+    "Selecting key '${_keys_sorted[-1]}'."
   _fingerprint="$( \
     gpg-key-info \
       -o \
@@ -610,34 +610,10 @@ _key_latest_select() {
       "${_keys_sorted[-1]}")"
 }
 
-_key_git_select() {
-  local \
-    _msg=()
-  _msg=(
-    "using default git signing key"
-  )
-  _msg_info \
-    "${_msg[*]}"
-  _fingerprint="$( \
-    git \
-      config \
-        --list | \
-      grep \
-        signingkey | \
-        awk \
-          -F \
-            "=" \
-          '{print $2}')"
-}
-
 _pgp_fingerprint_auto_detect() {
   local \
     _fingerprint
-  if [[ "${publishing_platform}" == "fur" ]]; then
-    _key_git_select
-  elif [[ "${publishing_platform}" == "ur" ]]; then
-    _key_latest_select
-  fi
+  _key_latest_select
   _set_override \
     "pgp" \
     "fingerprint" \
@@ -647,20 +623,7 @@ _pgp_fingerprint_auto_detect() {
 _pgp_email_auto_detect() {
   local \
     _email
-  if [[ "${publishing_platform}" == "ur" ]]; then
-    _email=""
-  elif [[ "${publishing_platform}" == "fur" ]]; then
-    _email="$( \
-      git \
-        config \
-          --list | \
-        grep \
-          email | \
-          awk \
-            -F \
-              "=" \
-            '{print $2}')"
-  fi
+  _email=""
   _set_override \
     "pgp" \
     "email" \
