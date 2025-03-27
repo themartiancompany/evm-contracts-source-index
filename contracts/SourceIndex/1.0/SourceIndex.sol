@@ -400,6 +400,33 @@ contract SourceIndex {
     }
 
     /**
+     * @dev Read deployment transaction hash for a contract.
+     * @param _publisher User publishing the contract.
+     * @param _chainId ID of the blockchain for which
+     *                 the contract address is provided.
+     * @param _contractAddress address of the contract
+     *                         of which to retrieve the
+     *                         deployment transaction hash.
+     */
+    function readDeploymentTransaction(
+      address _publisher,
+      uint256 _chainId,
+      address _contractAddress)
+    public
+    view
+    returns (string memory)
+    {
+      checkLocked(
+        _publisher,
+        _chainId,
+        _contractAddress);
+      return deploymentTransaction[
+               _publisher][
+                 _chainId][
+                   _contractAddress];
+    }
+
+    /**
      * @dev Read published Ethereum Virtual Machine target
      *      version for a contract.
      * @param _publisher User publishing the contract.
