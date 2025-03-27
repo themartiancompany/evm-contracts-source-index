@@ -102,7 +102,7 @@ _global_variables() {
   source_publish=""
   contract_address=""
   contract_source=""
-  deployment_transaction=""
+  tx_deployment=""
   evm_version=""
   target_compiler=""
   compiler_version=""
@@ -436,7 +436,7 @@ _evm_contract_source_publish() {
     _contract_network="${16}" \
     _contract_address="${17}" \
     _contract_source="${18}" \
-    _deployment_transaction="${19}" \
+    _tx_deployment="${19}" \
     _evm_version="${20}" \
     _target_compiler="${21}" \
     _compiler_version="${22}" \
@@ -510,7 +510,7 @@ _evm_contract_source_publish() {
       "source code '${_contract_source}'"
       "for '${_contract_name}' contract"
       "deployed on network '${_contract_network}'"
-      "at transaction '${_deployment_transaction}'"
+      "at transaction '${_tx_deployment}'"
       "with address '${_contract_address}',"
       "pointing to EVMFS URI '${_source_uri}',"
       "set to be built for EVM version"
@@ -529,7 +529,7 @@ _evm_contract_source_publish() {
       "${_contract_network}" \
       "${_contract_address}" \
       "${_source_uri}" \
-      "${_deployment_transaction}" \
+      "${_tx_deployment}" \
       "${_evm_version}" \
       "${_target_compiler}" \
       "${_compiler_version}"
@@ -842,7 +842,7 @@ Usage:
     <contract_network>
     <contract_address>
     <contract_source>
-    <deployment_transaction>
+    <tx_deployment>
     <evm_version>
     <compiler>
     <compiler_version>
@@ -929,6 +929,7 @@ _show_config() {
   _msg_info "           Contract network:   ${contract_network}"
   _msg_info "           Contract address:   ${contract_address}"
   _msg_info "            Target contract:   ${contract_source}"
+  _msg_info "     Deployment transaction:   ${tx_deployment}"
   _msg_info "         Target EVM version:   ${evm_version}"
   _msg_info "            Target compiler:   ${target_compiler}"
   _msg_info "    Target compiler version:   ${compiler_version}"
@@ -1049,7 +1050,7 @@ fi
 contract_network="${1}"
 contract_address="${2}"
 contract_source="${3}"
-deployment_transaction="${4}"
+tx_deployment="${4}"
 evm_version="${5}"
 target_compiler="${6}"
 compiler_version="${7}"
@@ -1076,7 +1077,7 @@ app_opts=(
   "${contract_network}"
   "${contract_address}"
   "${contract_source}"
-  "${deployment_transaction}"
+  "${tx_deployment}"
   "${evm_version}"
   "${target_compiler}"
   "${compiler_version}"
