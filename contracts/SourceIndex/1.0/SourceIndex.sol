@@ -55,6 +55,13 @@ contract SourceIndex {
       address => mapping (
         uint256 => mapping(
           address => bool ) ) ) public lock;
+    mapping(
+      uint256 => mapping (
+        address => mapping(
+          uint256 => address ) ) ) public sourcePublisher;
+    mapping(
+      uint256 => mapping (
+        address => uint256 ) ) public sourcePublisherNo;
     constructor() {}
 
     /**
@@ -370,6 +377,19 @@ contract SourceIndex {
           _chainId][
             _contractAddress] =
         true;
+      sourcePublisher[
+        _chainId][
+          _contractAddress][
+            sourcePublisherNo[
+              _chainId][
+                _contractAddress]] =
+        _publisher;
+      sourcePublisherNo[
+        _chainId][
+          _contractAddress] =
+        sourcePublisherNo[
+          _chainId][
+            _contractAddress] + 1;
     }
 
     /**
