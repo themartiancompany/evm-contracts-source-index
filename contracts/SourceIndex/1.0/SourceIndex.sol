@@ -50,6 +50,10 @@ contract SourceIndex {
     mapping(
       address => mapping (
         uint256 => mapping(
+          address => bytes32 ) ) ) public deploymentTransaction;
+    mapping(
+      address => mapping (
+        uint256 => mapping(
           address => bool ) ) ) public lock;
     constructor() {}
 
@@ -131,11 +135,11 @@ contract SourceIndex {
         _uri_prefix[
           _i] =
           bytes(
-	    _uri)[
+            _uri)[
               _i];
       }
       require(
-	_uri_prefix.length == _prefix.length &&
+        _uri_prefix.length == _prefix.length &&
         keccak256(
           _uri_prefix) == keccak256(
                             _prefix),
@@ -151,6 +155,7 @@ contract SourceIndex {
      *                         which the source is provided.
      * @param _source Ethereum Virtual Machine File System
      *                link to the source code of the contract.
+     * @param _tx Deployment transaction hash for the contract.
      * @param _evmVersion Ethereum Virtual Machine version
      *                    for which the contract has been built.
      * @param _compiler Compiler which has been used
@@ -162,6 +167,7 @@ contract SourceIndex {
       uint256 _chainId,
       address _contractAddress,
       string memory _source,
+      bytes32 _tx,
       string memory _evmVersion,
       string memory _compiler,
       string memory _compilerVersion) public {
@@ -178,6 +184,11 @@ contract SourceIndex {
           _chainId][
             _contractAddress] =
         _source;
+      deploymentTransaction[
+        _publisher][
+          _chainId][
+            _contractAddress] =
+        _tx;
       evmVersion[
         _publisher][
           _chainId][
@@ -223,6 +234,33 @@ contract SourceIndex {
           _chainId][
             _contractAddress] =
         _source;
+    }
+
+    /**
+     * @dev Publishes deployment transaction hash for a contract.
+     * @param _publisher User publishing the contract.
+     * @param _chainId ID of the blockchain for which
+     *                 the contract address is provided.
+     * @param _contractAddress Address of the contract for
+     *                         which the source is provided.
+     * @param _tx Deployment transaction hash for the contract.
+     */
+    function publishDeploymentTransaction(
+      address _publisher,
+      uint256 _chainId,
+      address _contractAddress,
+      bytes32 _tx) public {
+      checkOwner(
+        _publisher);
+      checkUnlocked(
+        _publisher,
+        _chainId,
+        _contractAddress);
+      deploymentTransaction[
+        _publisher][
+          _chainId][
+            _contractAddress] =
+        _tx;
     }
 
     /**

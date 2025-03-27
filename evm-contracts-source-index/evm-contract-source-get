@@ -27,18 +27,25 @@ _bin="$( \
       command \
         -v \
 	  "env")")"
-_lib="${_bin}/../lib"
-_share="${_bin}/../share"
-source \
-  "${_lib}/libcrash-bash/crash-bash"
-source \
-  "${_lib}/libevm/libevm"
+_lib="$( \
+  realpath \
+    "${_bin}/../lib")"
+_crash_bash="${_lib}/libcrash-bash/crash-bash"
+_libevm="${_lib}/libevm/libevm"
+_sourced \
+  "${_crash_bash}" 2>/dev/null || \
+  source \
+    "${_crash_bash}"
+_sourced \
+  "${_libevm}"
 
 # Check all required programs
 # are available
 _requirements() {
-  local \
-    _zlib
+  _check_cmd \
+    'libevm-requirements' \
+    'libevm'
+  libevm-requirements
   _check_cmd \
     'evm-contract-call' \
     'evm-contracts-tools'
@@ -48,52 +55,18 @@ _requirements() {
   _check_cmd \
     'evm-wallet'
   _check_cmd \
-    'git'
+    'evmfs'
   _check_cmd \
-    'evm-gpg' \
-    'evm-gnupg'
-  _check_cmd \
-    'find' \
-    'findutils'
-  _check_cmd \
-    'gpg-key-info'
-  _check_cmd \
-    'libevm-requirements' \
-    'libevm'
-  libevm-requirements
-  _check_cmd \
-    'rsync'
-  _check_cmd \
-    'tar'
-  _zlib="$( \
-    find \
-      "$(_get_lib)/libz."* \
-      -type \
-        "f" \
-        2>/dev/null || \
-    true)"
-  if [[ "${_zlib}" == "" ]]; then
-    _msg_error \
-      "No Zlib library detected." \
-      1
-  fi
-  _check_cmd \
+    'ur-publishers' \
     'ur'
 }
 
 # shellcheck disable=SC2034
 _global_variables() {
-  publishing_date=()
-  local_packages=()
-  package_type=""
+  pkgs=()
+  get_date=""
   ur_address=""
   ur_version=""
-  pp_address=""
-  pp_version=""
-  up_address=""
-  up_version=""
-  deployments_dir=""
-  user_level=""
   wallet_name=""
   wallet_path=""
   wallet_password=""
@@ -101,656 +74,900 @@ _global_variables() {
   wallet_address=""
   target_network=""
   api_key=""
-  cache_dir=""
-  gnupg_home=""
-  repo_dir=""
-  repo_origin=""
-  publishing_platform=""
-  target_publisher=""
-  target_platform=""
-  target_price=""
-  measure_unit=""
-  target_uri=""
-  recipe_publish=""
-  package_list=""
-  target_arch=""
-  pub_dir=""
-  pgp_fingerprint=""
-  pgp_email=""
+  retrieve_force=""
+  verify_skip=""
+  deployments_dir=""
+  user_level=""
+  source_origin=""
+  source_publisher=""
+  target_revision=""
   output_dir=""
+  work_dir=""
   color=""
   quiet=""
 }
 
-_conf_dir_auto_detect() {
+# Get source from a selected origin
+# $1: origin (archlinux,
+#             aur,
+#             gur)
+_git_repo_uri_get() {
   local \
-    _dir
-  _dir="${HOME}/.config/${app_name}"
-  echo \
-    "${_dir}"
-}
-
-_cache_dir_auto_detect() {
-  local \
-    _dir
-  _dir="${HOME}/.cache/${app_name}"
-  echo \
-    "${_dir}"
-}
-
-_get_arch() {
-  local \
-    _pkg="${1}" \
-    _filename \
-    _filename_array=() \
-    _string \
-    _arch
-  _filename="$( \
-    basename \
-      "${_pkg}")"
-  IFS="-" \
-  read \
-    -r \
-    -a \
-    _filename_array <<< \
-    "${_filename}"
-  _string="${_filename_array[-1]}"
-  _arch="${_string%%.*}" 
-  echo \
-    "${_arch}"
-}
-
-_fur_get_opts(){
-  local \
-    _platform="${1}" \
-    _fur_opts=()
-  _get_cmd="fur"
-  _fur_opts=(
-    -d
-    # -P
-    #   "${_platform}"
-    -w
-      "${_pub_repo}"
-  )
-  _get_opts=(
-    "${_fur_opts[@]}"
-  )
-}
-
-_lur_get_opts() {
-  local \
-    _platform="${1}" \
-    _lur_opts=()
-  _get_cmd="lur"
-  _lur_opts=(
-    -d \
-      "${_repo}/lur"
-    -o
-      "${_binary_packages_tmp_dir}"
-    -n
-  )
-  _get_opts+=(
-    "${_lur_opts[@]}"
-  )
-}
-
-_fur_repo_clean() {
-  local \
-    _dir="${1}" \
-    _find_opts=() \
-    _msg=()
-  _msg=(
-    "looking for packages and signatures"
-    "in '${_dir}'."
-  )
-  _msg_info \
-    "${_msg[*]}"
-  _find_opts+=(
-    -type
-      "f"
-    -iwholename
-      "*/${_platform}/*.pkg.*"
-    -print0
-  )
-  _msg=(
-    "running find with options"
-    "'${_find_opts[@]}'"
-  )
-  _msg_info \
-    "${_msg[*]}"
-  mapfile \
-    -d \
-    $'\0' \
-    _pkgs < \
-    <(find \
-        "${_dir}" \
-	"${_find_opts[@]}" 2>/dev/null || \
-      true)
-  _msg_info \
-    "removing packages and signatures '${_pkgs[*]}'"
-  rm \
-    -rf \
-    "${_pkgs[@]}" || \
-    true
-}
-
-_fur_get() {
-  local \
-   _dir="${1}" \
-   _platform="${2}" \
-   _oldpwd
-  _oldpwd="$( \
-    pwd)"
-  cd \
-    "${_dir}"
-  "_fur_get_opts" \
-    "${_platform}"
-  if [[ "${quiet}" != "y" ]]; then
-    _get_opts+=(
-      -v
-    )
+    _origin="${1}" \
+    _publisher="${2}" \
+    _pkg="${3}" \
+    _http \
+    _ns
+  _ns="${_publisher}"
+  if [[ "${_origin}" == "archlinux" ]]; then
+    _http='https://gitlab.archlinux.org'
+    echo \
+      "${_http}/${_ns}/packaging/packages/${_pkg}"
+  elif [[ "${_origin}" == "aur" ]]; then
+    _http='https://aur.archlinux.org'
+    echo \
+      "${_http}/${_pkg}"
+  elif [[ "${_origin}" == "gur" ]]; then
+    _http="http://github.com"
+    _ns="${_publisher}"
+    echo \
+      "${_http}/${_ns}/${_pkg}-ur"
   fi
-  if [[ "${color}" == "y" ]]; then
-    _get_opts+=(
-      -c
-    )
-  fi || \
-    true
-  _msg_info \
-    "running fur with ${_get_opts[*]}"
-  "${_get_cmd}" \
-    "${_get_opts[@]}" \
-    "${_pkg}" || \
-  "${_get_cmd}" \
-    "${_get_opts[@]}" \
-    "${_pub}"
-  _fur_repo_clean \
-    "${_pub_repo}"
-  cd \
-    "${_oldpwd}"
 }
 
-_lur_binary_package_get() {
+_clone_validate() {
   local \
-    _dir="${1}" \
-    _platform="${2}" \
-   _oldpwd
-  _oldpwd="$( \
-    pwd)"
-  cd \
-    "${_dir}"
-  "_lur_get_opts" \
-    "${_platform}"
-  if [[ "${quiet}" != "y" ]]; then
-    _get_opts+=(
-      -v
-    )
-  fi
-  if [[ "${color}" == "y" ]]; then
-    _get_opts+=(
-      -c
-    )
-  fi || \
-    true
-  _msg_info \
-   "running lur with ${_get_opts[*]}"
-  "${_get_cmd}" \
-      "${_get_opts[@]}" \
-      "${_pkg}" || \
-  "${_get_cmd}" \
-      "${_get_opts[@]}" \
-      "${_pub}"
-  _binary_pkgs=( $( \
-    find \
-      "${_binary_packages_tmp_dir}" \
-      -iname \
-        '*.pkg.*' \
-      -exec \
-        echo \
-          "{}" ';')
+    _pkg_dir="${1}" \
+    _msg=() \
+    _git_opts=()
+  _git_opts+=(
+    -C
+      "${_pkg_dir}"
   )
-  _msg_info \
-    "found packages ${_binary_pkgs[*]}"
-  cd \
-    "${_oldpwd}"
-}
-
-_pkgs_find() {
-  local \
-    _dir="${1}" \
-    _find_opts=() \
-    _msg=()
-  _msg=(
-    "looking for packages"
-    "in '${_dir}'."
-  )
-  _msg_info \
-    "${_msg[*]}"
-  _find_opts+=(
-    -type
-      "f"
-    -name
-      "*.pkg.*"
-    -print0
-  )
-  _msg=(
-    "running find with options"
-    "'${_find_opts[@]}'"
-  )
-  _msg_info \
-    "${_msg[*]}"
-  mapfile \
-    -d \
-    $'\0' \
-    _pkgs < \
-    <(find \
-        "${_dir}" \
-	"${_find_opts[@]}" 2>/dev/null || \
-      true)
-}
-
-_fur_sign() {
-  local \
-    _binary_repo_dir="${1}" \
-    _fingerprint="${2}" \
-    _detach="${3}" \
-    _oldpwd \
-    _pkgs=() \
-    _pkg \
-    _gpg_opts=() \
-    _msg=()
-  _oldpwd="$( \
-    pwd)"
-  _gpg_opts+=(
-    --local-user
-      "${_fingerprint}"
-    --sign
-  )
-  if [[ "${_detach}" == "y" ]]; then
-    _gpg_opts+=(
-      --detach
-    )
-  fi
-  cd \
-    "${_binary_repo_dir}"
-  if [[ "${quiet}" == "n" ]]; then
-    tree \
-      "$(pwd)"
-  fi
-  _pkgs_find \
-    "${_binary_repo_dir}"
-  for _pkg in "${_pkgs[@]}"; do
+  if [[ ! -d "${_pkg_dir}" ]]; then
     _msg=(
-      "signing package '${_pkg}'"
+      "Cloning into '${_pkg_dir}'"
+      "failed."
+    )
+    _msg_warning \
+      "${_msg[*]}"
+  fi
+  _commit_last="$( \
+    git \
+      "${_git_opts[@]}" \
+      rev-parse \
+        HEAD 2>/dev/null || \
+    true)"
+
+  if [[ "${_commit_last}" == "" ]]; then
+    _msg=(
+      "Repository not cloned."
+    )
+    _msg_warning \
+      "${_msg[*]}"
+  elif [[ "${_commit_last}" == "HEAD" ]]; then
+    _msg=(
+      "Cloned an empty repository,"
+      "deleting."
+    )
+    _msg_warning \
+      "${_msg[*]}"
+    rm \
+      -rf \
+      "${_pkg_dir}"
+  elif [[ "${_commit_last}" != "HEAD" && \
+	  "${_commit_last}" != "" ]]; then
+    _retrieved="true"
+    unset \
+      GIT_TERMINAL_PROMPT
+  fi
+}
+
+_git_clone() {
+  local \
+    _origin="${1}" \
+    _publisher="${2}" \
+    _pkg_dir="${3}" \
+    _pkg="${4}" \
+    _clone_opts=() \
+    _uri
+  if [[ "${quiet}" == "y" ]]; then
+    _clone_opts+=(
+      --quiet
+    )
+  fi
+  _uri="$( \
+    _git_repo_uri_get \
+      "${_origin}" \
+      "${_publisher}" \
+      "${_pkg}")"
+  GIT_TERMINAL_PROMPT=0 \
+  git \
+    clone \
+      "${_clone_opts[@]}" \
+      "${_uri}" \
+      "${_pkg_dir}" || \
+    true
+  _clone_validate \
+    "${_pkg_dir}"
+}
+
+_contract_call_opts_setup() {
+  local \
+    _msg=() \
+    _evm_contract_call_opts=() \
+    _ur_call_opts=()
+  _evm_contract_call_opts+=(
+    -n
+      "${_target_network}"
+    -k
+      "${_api_key_path}"
+  )
+  _ur_call_opts+=(
+    "${_evm_contract_call_opts[@]}"
+    -A
+      "${_ur_abi}"
+    -B
+      "${_ur_bytecode}"
+    -C
+      "${_ur_compiler_output}"
+  )
+  _validate_call_opts+=(
+    "${_ur_call_opts[@]}"
+    -t
+      "static"
+  )
+  _retrieve_call_opts+=(
+    "${_ur_call_opts[@]}"
+    -t
+      "static"
+    -N
+      "${_wallet_name}"
+  )
+}
+
+_recipe_archive_uri_get() {
+  local \
+    _ur_address="${1}" \
+    _publisher="${2}" \
+    _pkg="${3}" \
+    _revision="${4}" \
+    _recipe_archive \
+    _price \
+    _purchased \
+    _msg=() \
+    _wallet_address
+  _wallet_address="$( \
+    evm-wallet \
+      get \
+        "${_wallet_name}" \
+        "address")"
+  _purchased="$( \
+    evm-contract-call \
+      "${_validate_call_opts[@]}" \
+      "${_ur_address}" \
+      "purchased" \
+      "${_pkg}" \
+      "${_publisher}" \
+      "${_revision}" \
+      "${_wallet_address}")"
+  if [[ "${_purchased}" == "false" ]]; then
+    _msg=(
+      "Wallet '${_wallet_name}'"
+      "identified by address '${_wallet_address}'"
+      "has not purchased revision '${_revision}'"
+      "of package '${_pkg}' by publisher '${_publisher}'".
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      0
+    _msg=(
+      "Getting price for revision '${_revision}'"
+      "of package '${_pkg}' by publisher"
+      "'${_publisher}'."
     )
     _msg_info \
       "${_msg[*]}"
-    gpg \
-      "${_gpg_opts[@]}" \
-      "${_pkg}"
-  done
-  cd \
-    "${_oldpwd}"
+    _price="$( \
+      evm-contract-call \
+        "${_validate_call_opts[@]}" \
+        "${_ur_address}" \
+        "price" \
+        "${_pkg}" \
+        "${_publisher}" \
+        "${_revision}")"
+    _msg=(
+      "Revision '${_revision}' of package"
+      "'${_pkg}' by publisher"
+      "'${_publisher}' can be purchased for"
+      "\$${_price} by running"
+      "'ur-purchase ${_pkg}'."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  elif [[ "${_purchased}" == "" ]]; then
+    _msg=(
+      "Error retrieving the purchasing"
+      "status of the package by the user"
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+  _msg=(
+    "Retrieving recipe URI"
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _recipe_archive_uri="$( \
+    evm-contract-call \
+      "${_retrieve_call_opts[@]}" \
+      "${_ur_address}" \
+      "readRecipe" \
+      "${_pkg}" \
+      "${_publisher}" \
+      "${_revision}")"
+  if [[ "${_recipe_archive_uri}" == "" ]]; then
+    _msg=(
+      "Target revision '${_revision}' of package"
+      "'${_pkg}' by publisher"
+      "'${_publisher}' does not exist or there has"
+      "been an error retrieving it."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
 }
 
-_ur_sign() {
+_revision_latest_get() {
   local \
-    _source_repo="${1}" \
-    _pkg="${2}" \
-    _gnupg_home="${3}" \
-    _key_fingerprint="${4}" \
-    _gpg_opts=() \
+    _ur_address="${1}" \
+    _publisher="${2}" \
+    _pkg="${3}" \
+    _msg=() \
+    _revno
+  _msg=(
+    "Getting latest revision for"
+    "package '${_pkg}' and publisher"
+    "'${_publisher}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _revno="$( \
+    evm-contract-call \
+      "${_validate_call_opts[@]}" \
+      "${_ur_address}" \
+      "revNo" \
+      "${_pkg}" \
+      "${_publisher}")"
+  if [[ "${_revno}" == "0" ]]; then
+    _msg=(
+      "Publisher '${_publisher}'"
+      "has published no '${_pkg}'"
+      "package."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  elif (( 0 < "${_revno}" )); then
+    _revision_latest="$(( \
+      _revno - 1))"
+    _msg=(
+      "Latest revision for '${_pkg}'"
+      "is '${_revision_latest}'."
+    )
+    _msg_info \
+      "${_msg[*]}"
+  else
+    _msg=(
+      "Error while retrieving"
+      "revision for package '${_pkg}'"
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+}
+
+_recipe_archive_get() {
+  local \
+    _uri="${1}" \
+    _dest="${2}" \
+    _evmfs_opts=() \
     _msg=()
   _msg=(
-    "Signing source recipe repo"
-    "archive '${_source_repo}/${_pkg}.tar.xz'."
+    "Saving recipe in '${_dest}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  if [[ "${quiet}" == "n" ]]; then
+    _evmfs_opts+=(
+      -v
+    )
+  fi
+  _evmfs_opts+=(
+    -o
+      "${_dest}"
+  )
+  evmfs \
+    "${_evmfs_opts[@]}" \
+    get \
+      "${_uri}" || \
+    true
+  if [[ ! -e "${_dest}" ]]; then
+    _msg=(
+      "Error saving the build"
+      "recipe in '${_dest}'."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  elif [[ -e "${_dest}" ]]; then
+    _msg=(
+      "Recipe archive correctly saved onto"
+      "'${_dest}'."
+    )
+    _msg_info \
+      "${_msg[*]}"
+  fi
+}
+
+_signature_keyring_verify() {
+  local \
+    _gpg_out="${1}" \
+    _nopubkey_string \
+    _goodsig_string \
+    _fingerprint_string \
+    _errsig_string \
+    _fingerprint
+   _nopubkey_string="$( \
+    echo \
+      "${_gpg_out}" | \
+      grep \
+        "^\[GNUPG:\] NO_PUBKEY " || \
+      true)"
+  _goodsig_string="$( \
+    echo \
+      "${_gpg_out}" | \
+      grep \
+        "^\[GNUPG:\] GOODSIG " || \
+      true)"
+  if [[ "${_nopubkey_string}" == "" ]] && \
+     [[ "${_goodsig_string}" != "" ]]; then
+    _fingerprint_string="$( \
+      echo \
+        "${_gpg_out}" | \
+        grep \
+          "^\[GNUPG:\] KEY_CONSIDERED " || \
+        true)"
+    _fingerprint="$( \
+      echo \
+        "${_fingerprint_string}" | \
+        awk \
+          '{print $3}')"
+    _msg=(
+      "The key used to sign the archive"
+      "is correct and has fingerprint"
+      "'${_fingerprint}'."
+    )
+  elif [[ "${_nopubkey_string}" != "" ]] && \
+       [[ "${_goodsig_string}" == "" ]]; then
+    _errsig_string="$( \
+      echo \
+        "${_gpg_out}" | \
+        grep \
+          "^\[GNUPG:\] ERRSIG " || \
+        true)"
+    _fingerprint="$( \
+      echo \
+        "${_errsig_string}" | \
+        awk \
+          '{print $9}')"
+    _msg=(
+      "Archive signed with unknown"
+      "fingerprint '${_fingerprint}'."
+      "If you are sure the fingerprint"
+      "is indeed correct run"
+      "'ur-publishers update'"
+      "to update the Ur publishers"
+      "signatures' database."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+}
+
+_newkey_author_extract(){
+  local \
+    _gpg_out="${1}" \
+    _pattern
+  _pattern="^\[GNUPG:\] NEWSIG "
+  _author_string="$( \
+    echo \
+      "${_gpg_out}" | \
+      grep \
+        "${_pattern}" || \
+      true)"
+  _author="$( \
+    echo \
+      "${_author_string}" | \
+      awk \
+        '{print $3}')"
+}
+
+_validkey_author_extract(){
+  local \
+    _gpg_out="${1}" \
+    _pattern \
+    _fingerprint \
+    _gpg_opts=() \
+    _gpg_key_info_opts=()
+  _gpg_opts+=(
+    --homedir
+      "${_gnupg_home}"
+    --export
+    --armor
+  )
+  _gpg_key_info_opts+=(
+    -o
+      "email"
+  )
+  _pattern="^\[GNUPG:\] VALIDSIG "
+  _author_string="$( \
+    echo \
+      "${_gpg_out}" | \
+      grep \
+        "${_pattern}" || \
+      true)"
+  _fingerprint="$( \
+    echo \
+      "${_author_string}" | \
+      awk \
+        '{print $3}')"
+  gpg \
+    "${_gpg_opts[@]}" \
+    "${_fingerprint}" > \
+    "${_pkg_dir}/${_fingerprint}.asc"
+  _author="$( \
+    gpg-key-info \
+      "${_gpg_key_info_opts[@]}" \
+      "${_pkg_dir}/${_fingerprint}.asc")"
+  rm \
+    -rf \
+    "${_pkg_dir}/${_fingerprint}.asc"
+}
+
+_signature_author_verify() {
+  local \
+    _publisher="${1}" \
+    _gpg_out="${2}" \
+    _author_string \
+    _author \
+    _msg=() \
+    _unsigned \
+    _patterns=() \
+    _pattern
+  _publisher="$( \
+    _lower \
+      "${_publisher}")"
+  _newkey_author_extract \
+    "${_gpg_out}"
+  if [[ "${_author}" == "" ]]; then
+    _validkey_author_extract \
+      "${_gpg_out}"
+  fi
+  _author="$( \
+    _lower \
+      "${_author}")"
+  if [[ "${_author_string}" == "" ]]; then
+    _unsigned="$( \
+      echo \
+        "${_gpg_out}" | \
+        grep \
+          "^\[GNUPG:\] NODATA 3" || \
+        true)"
+    if [[ "${_unsigned}" != "" ]]; then
+      _msg=(
+        "The archive is not signed."
+      )
+    else
+      _msg=(
+        "Unknown GNUPG error."
+        "GNUPG output:"
+      )
+    fi
+    _msg_error \
+      "${_msg[*]}" \
+      0
+    echo \
+      "${_gpg_out}"
+  fi
+  if [[ "${_author}" == "" ]]; then
+    _msg=(
+      "archive '${_archive}' is"
+      "missing an author."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+  if [[ "${_author}" != *"@${_publisher}" ]]; then
+    _msg=(
+      "archive '${_archive}' is signed"
+      "by '${_author#*@}' while it should"
+      "be signed by '${_publisher}'."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+}
+
+_recipe_archive_validate() {
+  local \
+    _archive="${1}" \
+    _publisher="${2}" \
+    _gpg_out \
+    _gpg_opts=() \
+    _author \
+    _msg=()
+  _msg=(
+    "Validating archive"
+    "'${_archive}' has been properly"
+    "signed by '${_publisher}'."
   )
   _msg_info \
     "${_msg[*]}"
   _gpg_opts+=(
     --homedir
       "${_gnupg_home}"
-    --local-user
-      "${_key_fingerprint}"
-    --sign
-    --output
-      "${_source_repo}/${_pkg}.tar.xz.gpg"
+    --with-colons
+    --status-fd
+      1
+    --verify
   )
-  if [[ "${quiet}" == "n" ]]; then
+  if [[ ! -e "${_archive}" ]]; then
     _msg=(
-      "Source recipe repo"
-      "contents:"
+      "Somehow the archive '${_archive}'"
+      "does not exist."
     )
     _msg_info \
       "${_msg[*]}"
-    tree \
-      "${_source_repo}"
+  elif [[ -e "${_archive}" ]]; then
+    _msg=(
+      "Found archive at location"
+      "'${_archive}.'"
+    )
   fi
-  gpg \
-    "${_gpg_opts[@]}" \
-    "${_source_repo}/${_pkg}.tar.xz"
+  if [[ "${quiet}" == "y" ]]; then
+    _gpg_out="$( \
+      gpg \
+        "${_gpg_opts[@]}" \
+        "${_archive}" 2>/dev/null || \
+      true)"
+  elif [[ "${quiet}" == "n" ]]; then
+    _gpg_out="$( \
+      gpg \
+        "${_gpg_opts[@]}" \
+        "${_archive}" || \
+      true)"
+  fi
+  if [[ "${_gpg_out}" == "" ]]; then
+    _msg=(
+      "Error verifying archive signature."
+      "Try running 'ur-publishers update'."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+  _signature_author_verify \
+    "${_publisher}" \
+    "${_gpg_out}"
+  _signature_keyring_verify \
+    "${_gpg_out}"
 }
 
-_ur_compress() {
+_archive_contents_read() {
   local \
-    _source_dir="${1}" \
-    _pkg="${2}" \
+    _archive="${1}" \
+    _tar_opts=() \
+    _content \
+    _contents=() \
+    _msg=()
+  _tar_opts+=(
+    -t
+    -f
+  )
+  mapfile \
+    -d \
+    $'\n' \
+    _contents < \
+    <(tar \
+        "${_tar_opts[@]}" \
+        "${_archive}" || \
+      true)
+  for _content in "${_contents[@]}"; do
+    _archive_contents+=(
+      "${_content%$'\n'}"
+    )
+  done
+  if [[ "${_archive_contents[*]}" == "" ]]; then
+    _msg=(
+      "corrupted or empty archive '${_archive}'."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+}
+
+_archive_contents_check() {
+  local \
+    _pkg="${1}" \
+    _archive="${2}" \
+    _archive_contents=() \
+    _file \
     _msg=()
   _msg=(
-    "Compressing source recipe"
-    "repository for package"
-    "'${_pkg}'."
+    "Verifying '${_archive}'"
+    "integrity for package '${_pkg}'."
   )
   _msg_info \
     "${_msg[*]}"
-  XZ_OPT="-e9" \
+  _archive_contents_read \
+    "${_archive}"
+  for _file in "${_archive_contents[@]}"; do
+    if [[ "${_file}" != "${_pkg}/"* && \
+          "${_file}" != *"/" ]]; then
+      _msg=(
+        "Found '${_file}' in archive '${_archive}',"
+        "but all files must reside in the '${_pkg}/'"
+        "directory."
+      )
+      _msg_error \
+        "${_msg[*]}" \
+        1
+    fi
+  done
+}
+
+_recipe_archive_extract() {
+  local \
+    _pkg="${1}" \
+    _recipe_archive="${2}" \
+    _pkg_dir="${3}" \
+    _verify_skip="${4}" \
+    _msg=() \
+    _tar_archive \
+    _integrity_error \
+    _tar_opts=() \
+    _gpg_opts=() \
+    _archive_contents=() \
+    _file
+  _tar_archive="${_recipe_archive%.gpg}"
+  if [[ "${_verify_skip}" == "n" ]]; then
+    _gpg_opts+=(
+      --homedir
+        "${_gnupg_home}"
+      --output
+        "${_tar_archive}"
+      --decrypt
+    )
+    gpg \
+      "${_gpg_opts[@]}" \
+      "${_recipe_archive}"
+  fi
+  _archive_contents_check \
+    "${_pkg}" \
+    "${_tar_archive}"
+  if [[ "${quiet}" == "n" ]]; then
+    _tar_opts+=(
+      -v
+    )
+  fi
+  _tar_opts+=(
+    --directory
+      "${_pkg_dir}"
+    -x
+    -f
+  )
   tar \
-    --transform \
-      "s%^${_source_dir#/}/${_pkg}%${_pkg}%" \
-    --create \
-    --file \
-      "${_source_dir}/${_pkg}.tar.xz" \
-    --xz \
-    "${_source_dir}/${_pkg}"
+    "${_tar_opts[@]}" \
+    "${_tar_archive}"
 }
 
-_ur_upload() {
+_revision_validate() {
   local \
-    _source_dir="${1}" \
-    _pkg="${2}" \
-    _wallet_name="${3}" \
-    _wallet_path="${4}" \
-    _wallet_password="${5}" \
-    _wallet_seed="${6}" \
-    _target_network="${7}" \
-    _api_key_path="${8}" \
-    _evmfs_opts=() \
-    _evmfs_uri_opts=() \
+    _revision="${1}" \
+    _revision_latest="${2}" \
     _msg=()
-  _msg=(
-    "Uploading source recipe"
-    "repository signed archive"
-    "'${_source_dir}/${_pkg}.tar.xz.gpg'"
-    "for package '${_pkg}' to the EVMFS."
-  )
-  _msg_info \
-    "${_msg[*]}"
-  if [[ ! -v "EVMFS_OPTS" ]]; then
-    _evmfs_opts+=(
-      -N
-        "${_wallet_name}"
-      -w
-        "${_wallet_path}"
-      -p
-        "${_wallet_password}"
-      -s
-        "${_wallet_seed}"
-      -n
-        "${_target_network}"
-      -k
-        "${_api_key_path}"
-      -m
-        "standalone"
+  if (( "${_revision}" < "${_revision_latest}" )); then
+    _msg=(
+      "getting revision '${_revision}',"
+      "while latest is '${_revision_latest}'."
+    )
+    _msg_warning \
+      "${_msg[*]}"
+  elif (( "${_revision}" > "${_revision_latest}" )); then
+    _msg=(
+      "trying to get revision '${_revision}',"
+      "while latest is '${_revision_latest}'."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+}
+
+_ur_get() {
+  local \
+    _target_network="${1}" \
+    _ur_address="${2}" \
+    _publisher="${3}" \
+    _ur_abi="${4}" \
+    _ur_bytecode="${5}" \
+    _ur_compiler_output="${6}" \
+    _pkg_dir="${7}" \
+    _pkg="${8}" \
+    _revision="${9}" \
+    _verify_skip="${10}" \
+    _validate_call_opts=() \
+    _retrieve_call_opts=() \
+    _ur_publishers_opts=() \
+    _recipe_archive_uri \
+    _recipe_archive \
+    _revision_latest \
+    _gnupg_home \
+    _msg=()
+  _pkg_dir_setup \
+    "${_pkg_dir}"
+  _recipe_archive="${_pkg_dir}/${_pkg}.tar.xz"
+  if [[ "${_verify_skip}" == "n" ]]; then
+    _recipe_archive+=".gpg"
+    _gnupg_home="${HOME}/.cache/ur/publishers/gnupg"
+    if [[ ! -e "${_gnupg_home}" ]]; then
+      _msg=(
+        "User Repository publishers database"
+	"does not exist. Running 'ur-publishers update'."
+      )
+      _msg_info \
+        "${_msg[*]}"
+      if [[ "${quiet}" == "n" ]]; then
+        _ur_publishers_opts+=(
+	  -v
+        )
+      fi
+      ur-publishers \
+        "${_ur_publishers_opts[@]}" \
+        update
+    fi
+  fi
+  _contract_call_opts_setup 
+  _revision_latest_get \
+    "${_ur_address}" \
+    "${_publisher}" \
+    "${_pkg}"
+  if [[ "${_revision}" == "latest" || \
+        "${_revision}" == "" ]]; then
+    _revision="${_revision_latest}"
+  fi
+  _revision_validate \
+    "${_revision}" \
+    "${_revision_latest}"
+  _recipe_archive_uri_get \
+    "${_ur_address}" \
+    "${_publisher}" \
+    "${_pkg}" \
+    "${_revision}"
+  _recipe_archive_get \
+    "${_recipe_archive_uri}" \
+    "${_recipe_archive}"
+  if [[ "${_verify_skip}" == "n" ]]; then
+    _recipe_archive_validate \
+      "${_recipe_archive}" \
+      "${_publisher}"
+  elif [[ "${_verify_skip}" == "y" ]]; then
+    _msg=(
+      "Skipping signature verification."
+    )
+    _msg_info \
+      "${_msg[*]}"
+  fi
+  _recipe_archive_extract \
+    "${_pkg}" \
+    "${_recipe_archive}" \
+    "${_pkg_dir}" \
+    "${_verify_skip}"
+  _retrieved="true"
+}
+
+_source_get_opts() {
+  local \
+    _origin="${1}" 
+  if [[ "${_origin}" == "ur" ]]; then
+    _cmd=(
+      "_ur_get"
+    )
+    _cmd_args=(
+      "${_target_network}"
+      "${_ur_address}"
+      "${_publisher}"
+      "${_ur_abi}"
+      "${_ur_bytecode}"
+      "${_ur_compiler_output}"
+      "${_pkg_dir}"
+      "${_pkg}"
+      "${_revision}"
+      "${_verify_skip}"
     )
   else
-    _evmfs_opts+=(
-      $EVMFS_OPTS
+    _check_cmd \
+      'git'
+    _cmd=(
+      "_git_clone"
+    )
+    _cmd_args=(
+      "${_origin}"
+      "${_publisher}"
+      "${_pkg_dir}"
+      "${_pkg}"
     )
   fi
-  _evmfs_uri_opts+=(
-    "${_evmfs_opts[@]}"
-    -m
-      "simulate"
-  )
-  if [[ "${quiet}" == "n" ]]; then
-    _evmfs_opts+=(
-      -v
-    )
-  fi
-  evmfs \
-    "${_evmfs_opts[@]}" \
-    publish \
-      "${_source_dir}/${_pkg}.tar.xz.gpg"
-  _msg=(
-    "Getting uploaded source recipe"
-    "repository signed archive"
-    "'${_source_dir}/${_pkg}.tar.xz.gpg'"
-    "EVMFS uri."
-  )
-  _msg_info \
-    "${_msg[*]}"
-  _target_uri="$( \
-    evmfs \
-      "${_evmfs_uri_opts[@]}" \
-      publish \
-        "${_source_dir}/${_pkg}.tar.xz.gpg")"
 }
 
-_contract_call_opts_setup() {
-  _contract_call_opts+=(
-    -n
-      "${_target_network}"
-    -N
-      "${_wallet_name}"
-    -k
-      "${_api_key_path}"
-    -A
-      "${_abi}"
-    -B
-      "${_bytecode}"
-    -C
-      "${_compiler_output}"
-  )
-}
-
-_publish_call_opts_setup() {
+_origin_validate() {
   local \
-    _abi="${1}" \
-    _bytecode="${2}" \
-    _compiler_output="${3}" \
-    _contract_call_opts=()
-  _contract_call_opts_setup
-  if [[ "${quiet}" == "n" ]]; then
-    _publish_call_opts+=(
-      -v
-    )
-  fi
-  _publish_call_opts+=(
-    "${_contract_call_opts[@]}"
-    -t
-      "dynamic"
-  )
-}
-
-_package_list_call_opts_setup() {
-  local \
-    _abi="${1}" \
-    _bytecode="${2}" \
-    _compiler_output="${3}" \
-    _contract_call_opts=()
-  _contract_call_opts_setup
-  _unlisted_check_call_opts+=(
-    "${_contract_call_opts[@]}"
-    -t
-      "static"
-  )
-  if [[ "${quiet}" == "n" ]]; then
-    _package_list_call_opts+=(
-      -v
-    )
-  fi
-  _package_list_call_opts+=(
-    "${_contract_call_opts[@]}"
-    -t
-      "dynamic"
-  )
-}
-
-_publisher_check_call_opts_setup() {
-  local \
-    _abi="${1}" \
-    _bytecode="${2}" \
-    _compiler_output="${3}" \
-    _contract_call_opts=()
-  _contract_call_opts_setup
-  _publisher_check_call_opts+=(
-    "${_contract_call_opts[@]}"
-    -t
-      "static"
-  )
-}
-
-_ether_to_wei() {
-  local \
-    _ether="${1}" \
-    _unit
-  _scale=1000000000000000000
-  echo \
-    "$((_ether * _scale))"
-}
-
-_ur_publisher_check() {
-  local \
-    _up_address="${1}" \
-    _up_version="${2}" \
-    _deployments_dir="${3}" \
-    _target_network="${4}" \
-    _target_publisher="${5}" \
-    _listed \
-    _up_abi \
-    _up_bytecode \
-    _up_compiler_output \
-    _publisher_check_call_opts=() \
-    _msg=()
-  _msg=(
-    "Checking if publisher '${_target_publisher}'"
-    "is correctly registered on the User Repository."
-  )
-  _msg_info \
-    "${_msg[*]}"
-  _contract_artifacts_auto_detect \
-    "${_deployments_dir}" \
-    "${_target_network}" \
-    "UserRepositoryPublishers" \
-    "_up" \
-    "${_up_version}"
-  _publisher_check_call_opts_setup \
-    "${_up_abi}" \
-    "${_up_bytecode}" \
-    "${_up_compiler_output}"
-  _listed="$( \
-    evm-contract-call \
-      "${_publisher_check_call_opts[@]}" \
-      "${_up_address}" \
-      "listed" \
-      "${_target_publisher}")"
-  if [[ "${_listed}" == 0 ]]; then
-    _msg=(
-      "Publisher '${_target_publisher}'"
-      "is not registered on the User Repository."
-      "Register it by running 'ur-publishers"
-      "register <target_publisher>'"
-    )
+    _target_origin="${1}"
+  if [[ " ${_origins[*]} " != *" ${_target_origin}"* ]]; then
     _msg_error \
-      "${_msg[*]}" \
+      "unknown origin '${_target_origin}'." \
       1
-  elif (( 0 < "${_listed}" )); then
-    _msg=(
-      "Publisher '${_target_publisher}'"
-      "is correctly registered on the User Repository."
-    )
-    _msg_info \
-      "${_msg[*]}"
   fi
 }
 
-_ur_package_publisher_list() {
+_origins_sort() {
   local \
-    _pp_address="${1}" \
-    _ur_address="${2}" \
-    _up_address="${3}" \
-    _package="${4}" \
-    _target_publisher="${5}" \
-    _unlisted_check_call_opts=() \
-    _package_list_call_opts=() \
-    _msg=() \
-    _pp_abi \
-    _pp_bytecode \
-    _pp_compiler_output \
-    _listed
-  _msg=(
-    "Checking if publisher"
-    "'${_target_publisher}' is already"
-    "listed for package '${_package}'."
+    _target_origin="${1}" \
+    _origins_new=() \
+    _origin
+  _origins_new+=(
+    "${_target_origin}"
   )
-  _msg_info \
-    "${_msg[*]}"
-  _contract_artifacts_auto_detect \
-    "${_deployments_dir}" \
-    "${_target_network}" \
-    "PackagePublishers" \
-    "_pp" \
-    "${_ur_version}"
-  _package_list_call_opts_setup \
-    "${_pp_abi}" \
-    "${_pp_bytecode}" \
-    "${_pp_compiler_output}"
-  _listed="$( \
-    evm-contract-call \
-      "${_unlisted_check_call_opts[@]}" \
-      "${_pp_address}" \
-      "packagePublisherListed" \
-      "${_ur_address}" \
-      "${_up_address}" \
-      "${_package}" \
-      "${_target_publisher}")"
-  if [[ "${_listed}" == 0 ]]; then
-    _msg=(
-      "Publisher '${_target_publisher}' is not"
-      "listed for package '${_package}',"
-      "listing now."
-    )
-    _msg_info \
-      "${_msg[*]}"
-    _ur_publisher_check \
-      "${_up_address}" \
-      "${_ur_version}" \
-      "${_deployments_dir}" \
-      "${_target_network}" \
-      "${_target_publisher}"
-    evm-contract-call \
-      "${_package_list_call_opts[@]}" \
-      "${_pp_address}" \
-      "listPackagePublisher" \
-      "${_ur_address}" \
-      "${_up_address}" \
-      "${_package}" \
-      "${_target_publisher}"
-    _msg=(
-      "Publisher '${_target_publisher}' has"
-      "been correctly listed for"
-      "package '${_package}'."
-    )
-    _msg_info \
-      "${_msg[*]}"
-  elif (( 0 < "${_listed}" )); then
-    _msg=(
-      "Package '${_package}' already listed"
-      "for publisher '${_target_publisher}'."
-    )
-    _msg_info \
-      "${_msg[*]}"
-  fi
+  for _origin in \
+    "${_origins[@]}"; do
+    if [[ "${_origin}" != "${_target_origin}" ]]; then
+      _origins_new+=(
+        "${_origin}"
+      )
+    fi
+  done
+  _origins=(
+    "${_origins_new[@]}"
+  )
 }
 
-_evmfs_uri_check() {
+_pkg_dir_setup() {
   local \
-    _uri="${1}" \
+    _dir="${1}"
+  mkdir \
+    -p \
+    "${_dir}"
+  chmod \
+    700 \
+    "${_dir}"
+}
+
+_work_dir_check() {
+  local \
     _msg=()
-  if [[ "${_uri}" != "evmfs://"* ]]; then
+  if [[ ! -d "${_work_dir}" ]]; then
     _msg=(
-      "Signed package recipe archive"
-      "URI must be an EVMFS uri."
+      "work directory '${_work_dir}'"
+      "does not exist."
     )
     _msg_error \
       "${_msg[*]}" \
@@ -758,664 +975,169 @@ _evmfs_uri_check() {
   fi
 }
 
-_ur_pub() {
+_aspe() {
   local \
     _ur_address="${1}" \
     _ur_version="${2}" \
-    _up_address="${3}" \
-    _pp_address="${4}" \
-    _deployments_dir="${5}" \
-    _wallet_name="${6}" \
-    _wallet_path="${7}" \
-    _wallet_password="${8}" \
-    _wallet_seed="${9}" \
-    _target_network="${10}" \
-    _api_key_path="${11}" \
-    _target_publisher="${12}" \
-    _target_price="${13}" \
-    _measure_unit="${14}" \
-    _target_uri="${15}" \
-    _recipe_publish="${16}" \
-    _package_list="${17}" \
-    _work_dir="${18}" \
-    _gnupg_home="${19}" \
-    _key_fingerprint="${20}" \
-    _package="${21}" \
-    _msg=() \
+    _deployments_dir="${3}" \
+    _wallet_name="${4}" \
+    _wallet_path="${5}" \
+    _wallet_password="${6}" \
+    _wallet_seed="${7}" \
+    _target_network="${8}" \
+    _api_key_path="${9}" \
+    _retrieve_force="${10}" \
+    _verify_skip="${11}" \
+    _origin="${12}" \
+    _publisher="${13}" \
+    _revision="${14}" \
+    _work_dir="${15}" \
+    _output_dir="${16}" \
+    _pkgs=() \
+    _origin \
+    _origins=() \
+    _pkg_dir \
+    _recipe_dir \
+    _retrieved \
     _ur_abi \
     _ur_bytecode \
     _ur_compiler_output \
-    _publish_call_opts=()
-  _msg=(
-    "Publishing package '${_package}'"
-    "on the Ur."
+    _cmd=() \
+    _cmd_args=() \
+    _msg=()
+  shift \
+    16
+  _pkgs=(
+    "$@"
   )
-  _msg_info \
-    "${_msg[*]}"
+  _work_dir_check
+  _origins=(
+    "ur"
+    "gur"
+    "aur"
+    "archlinux"
+  )
+  _origin_validate \
+    "${_origin}"
+  _origins_sort \
+    "${_origin}"
   _contract_artifacts_auto_detect \
     "${_deployments_dir}" \
     "${_target_network}" \
     "UserRepository" \
     "_ur" \
     "${_ur_version}"
-  if [[ "${_recipe_publish}" == "n" ]]; then
-    _msg=(
-      "Skipping recipe publishing."
-    )
-    _msg_info \
-      "${_msg[*]}"
-  elif [[ "${_recipe_publish}" == "y" ]]; then
-    if [[ "${_target_uri}" == "" ]]; then
-      _ur_compress \
-        "${_work_dir}" \
-        "${_package}"
-      _ur_sign \
-        "${_work_dir}" \
-        "${_package}" \
-        "${_gnupg_home}" \
-        "${_key_fingerprint}"
-      _ur_upload \
-        "${_work_dir}" \
-        "${_package}" \
-        "${_wallet_name}" \
-        "${_wallet_path}" \
-        "${_wallet_password}" \
-        "${_wallet_seed}" \
-        "${_target_network}" \
-        "${_api_key_path}"
-    elif [[ "${_target_uri}" != "" ]]; then
+  for _pkg in "${_pkgs[@]}"; do
+    _retrieved="false"
+    _pkg_dir="${_work_dir}/${_pkg}"
+    for _origin in "${_origins[@]}"; do
+      _source_get_opts \
+        "${_origin}"
+      "${_cmd[@]}" \
+        "${_cmd_args[@]}"
+      if [[ "${_retrieved}" == "true" ]]; then
+	if [[ "${_origin}" == "ur" ]]; then
+          _recipe_dir="${_pkg_dir}/${_pkg}" 
+	else
+          _recipe_dir="${_pkg_dir}" 
+	fi
+        mv \
+          "${_recipe_dir}" \
+	  "${_output_dir}"
+        break
+      fi
+      if [[ "${_retrieve_force}" == "n" ]]; then
+        break
+      fi
+    done
+    if [[ "${_retrieved}" == "false" ]]; then
       _msg=(
-        "Signed recipe archive URI '${_target_uri}'"
-        "specified through command line, skipping"
-        "upload."
+        "Error retrieving '${_pkg}'"
+        "sources."
+      )
+      _msg_error \
+        "${_msg[*]}" \
+        1
+    elif [[ "${_retrieved}" == "true" ]]; then
+      _msg=(
+        "Build sources for '${_pkg}'"
+        "correctly retrieved."
       )
       _msg_info \
         "${_msg[*]}"
-      _evmfs_uri_check \
-        "${_target_uri}"
     fi
-    _publish_call_opts_setup \
-      "${_ur_abi}" \
-      "${_ur_bytecode}" \
-      "${_ur_compiler_output}"
-    _msg=(
-      "Publishing package '${_package}'"
-      "for publisher '${_target_publisher}'"
-      "with URI '${_target_uri}' and"
-      "price '${_target_price}'"
-      "'${_measure_unit}' on the Ur."
-    )
-    _msg_info \
-      "${_msg[*]}"
-    if [[ "${_measure_unit}" == "ether" ]]; then
-      _target_price="$( \
-        _ether_to_wei \
-          "${_target_price}")"
-    fi
-    evm-contract-call \
-      "${_publish_call_opts[@]}" \
-      "${_ur_address}" \
-      "publishRecipe" \
-      "${_package}" \
-      "${_target_publisher}" \
-      "${_target_price}" \
-      "${_target_uri}"
-    _msg=(
-      "Package '${_package}' correctly published."
-    )
-    _msg_info \
-      "${_msg[*]}"
-  fi
-  if [[ "${_package_list}" == "y" ]]; then
-    _ur_package_publisher_list \
-      "${_pp_address}" \
-      "${_ur_address}" \
-      "${_up_address}" \
-      "${_package}" \
-      "${_target_publisher}"
-  fi
-}
-
-_fur_pub() {
-  local \
-    _dir="${1}" \
-    _pkg="${2}" \
-    _publisher="${3}" \
-    _fingerprint="${4}" \
-    _platform="${5}" \
-    _packages=() \
-    _package \
-    _oldpwd \
-    _signature_detached \
-    _msg=()
-  shift \
-    5
-  _packages+=(
-    "$@"
-  )
-  _msg=(
-    "Publishing binary packages"
-    "'${_binary_pkgs[*]}'."
-  )
-  _msg_info \
-    "${_msg[*]}"
-  _signature_detached="y"
-  _oldpwd="$( \
-    pwd)"
-  _msg_info \
-   "Add ${_publisher}"
-   "remote in repo '${_dir}/${_pub}'"
-  git \
-    -C \
-      "${_dir}/${_pub}" \
-    remote \
-      add \
-        tmc \
-        "github:${_publisher}/${_pub}"
-  git \
-    -C \
-      "${_dir}/${_pub}" \
-    remote \
-      add \
-        gl \
-        "gitlab:${_publisher}/${_pub}"
-  git \
-    -C \
-      "${_dir}/${_pub}" \
-    checkout \
-      -b \
-      "${_pkg}" || \
-  git \
-    -C \
-      "${_dir}/${_pub}" \
-    checkout \
-      "${_pkg}"
-  for _package \
-    in "${_packages[@]}"; do
-    _msg_info \
-      "publishing package: ${_package}" 
-    _arch="$( \
-      _get_arch \
-        "${_package}")"
-    _package_dir="${_platform}/${_arch}"
-    _msg=(
-      "publishing origin ${_origin} directory ${_dir}"
-      "in ${_pub} directory '${_dir}/${_package_dir}'"
-    )
-    _msg_info \
-      "${_msg[*]}"
-    mkdir \
-      -p \
-      "${_dir}/${_pub}/${_package_dir}"
-    rsync \
-      -v \
-      -a \
-      "${_pkg[@]}" \
-      "${_dir}/${_pub}/${_package_dir}"
   done
-  _msg_info \
-    "entering ${_dir}/${_pub}"
-  cd \
-    "${_dir}/${_pub}"
-  "_${_pub}_sign" \
-    "${_dir}/${_pub}/${_package_dir}" \
-    "${_pgp_fingerprint}" \
-    "${_signature_detached}"
-  git \
-    add \
-      .
-  git \
-    commit \
-      -a \
-      -S \
-      -m \
-        "publish"
-  git \
-    push \
-      tmc 
-  git \
-    push \
-      gl || \
-    true
-  cd \
-    "${_oldpwd}"
 }
 
-_pub_opts_setup() {
-  if [[ "${_publishing_platform}" == "ur" ]]; then
-    _pub_opts+=(
-      "${_ur_address}"
-      "${_ur_version}"
-      "${_up_address}"
-      "${_pp_address}"
-      "${_deployments_dir}"
-      "${_wallet_name}"
-      "${_wallet_path}"
-      "${_wallet_password}"
-      "${_wallet_seed}"
-      "${_target_network}"
-      "${_api_key_path}"
-      "${_target_publisher}"
-      "${_target_price}"
-      "${_measure_unit}"
-      "${_target_uri}"
-      "${_recipe_publish}"
-      "${_package_list}"
-      "${_source_tmp_dir}"
-      "${_gnupg_home}"
-      "${_key_fingerprint}"
-      "${_pkg}"
-    )
-  elif [[ "${_publishing_platform}" == "fur" ]]; then
-    _pub_opts+=(
-      "${_pub_repo}" \
-      "${_pkg}" \
-      "${_publisher}" \
-      "${_key}" \
-      "${_platform}" \
-      "${_binary_pkgs[@]}"
-    )
-  fi
-}
-
-_repo_dir_setup() {
+_ur_publisher_auto_detect() {
   local \
-    _msg=() \
-    _tmp_dir
-  _tmp_dir="${_cache_dir}/repo"
-  _repo_dir="$( \
-    mktemp \
-      -d \
-      -p \
-        "${_tmp_dir}")"
+    _msg=()
   _msg=(
-    "Setting up repository directory"
-    "'${_repo_dir}'."
+    "Ur publisher not specified,"
+    "retrieving own package recipe"
+    "if published."
   )
-  _msg_info \
+  _msg_warning \
     "${_msg[*]}"
-  mkdir \
-    -p \
-    "${_repo_dir}"
-  chmod \
-    700 \
-    "${_repo_dir}"
+  _publisher="$( \
+    evm-wallet \
+     get \
+       "${wallet_name}" \
+       "address")"
 }
 
-_binary_packages_tmp_dir_setup() {
+_source_publisher_auto_detect() {
   local \
-    _msg=() \
-    _tmp_dir
-  _tmp_dir="${_cache_dir}/binaries"
-  _binary_packages_tmp_dir="$( \
-    mktemp \
-      -u \
-      -d \
-      -p \
-        "${_tmp_dir}")"
-  _msg=(
-    "Setting up temporary"
-    "binary packages directory"
-    "'${_binary_packages_tmp_dir}'."
-  )
-  _msg_info \
-    "${_msg[*]}"
-  mkdir \
-    -p \
-    "${_binary_packages_tmp_dir}"
-  chmod \
-    700 \
-    "${_binary_packages_tmp_dir}"
-}
-
-_pub_repo_setup() {
-  local \
-    _msg=() \
-    _tmp_dir
-  _tmp_dir="${_cache_dir}/publish"
-  _pub_repo="$( \
-    mktemp \
-      -u \
-      -d \
-      -p \
-        "${_tmp_dir}")"
-  _msg=(
-    "Setting up temporary"
-    "publication repository directory"
-    "'${_pub_repo}'."
-  )
-  _msg_info \
-    "${_msg[*]}"
-  mkdir \
-    -p \
-    "${_pub_repo}"
-  chmod \
-    700 \
-    "${_pub_repo}"
-}
-
-_source_tmp_dir_setup() {
-  local \
-    _msg=() \
-    _tmp_dir
-  _tmp_dir="${_cache_dir}/source"
-  _source_tmp_dir="$( \
-    mktemp \
-      -u \
-      -d \
-      -p \
-        "${_tmp_dir}")"
-  _msg=(
-    "Setting up temporary"
-    "source package directory"
-    "'${_source_tmp_dir}'."
-  )
-  _msg_info \
-    "${_msg[*]}"
-  mkdir \
-    -p \
-    "${_source_tmp_dir}"
-  chmod \
-    700 \
-    "${_source_tmp_dir}"
-}
-
-_source_prepare() {
-  local \
-    _source_repo="${1}" \
-    _pkg="${2}" \
-    _source_dir="${3}"
-  rsync \
-    -a \
-    "${_source_repo}/${_pkg}" \
-    "${_source_dir}"
-  if [[ -d "${_source_dir}/${_pkg}/.git" ]]; then
-    _msg=(
-      "Removing git repository data"
-      "directory '${_source_dir}/${_pkg}/.git'."
-    )
-    _msg_info \
-      "${_msg[*]}"
-    rm \
-      -rf \
-      "${_source_dir}/${_pkg}/.git"
-  fi
-}
-
-# $@: packages
-_pub() {
-  local \
-    _package_type="${1}" \
-    _ur_address="${2}" \
-    _ur_version="${3}" \
-    _up_address="${4}" \
-    _pp_address="${5}" \
-    _deployments_dir="${6}" \
-    _wallet_name="${7}" \
-    _wallet_path="${8}" \
-    _wallet_password="${9}" \
-    _wallet_seed="${10}" \
-    _target_network="${11}" \
-    _api_key_path="${12}" \
-    _cache_dir="${13}" \
-    _output_dir="${14}" \
-    _repo_dir="${15}" \
-    _origin="${16}" \
-    _publishing_platform="${17}" \
-    _target_publisher="${18}" \
-    _target_price="${19}" \
-    _measure_unit="${20}" \
-    _target_uri="${21}" \
-    _recipe_publish="${22}" \
-    _package_list="${23}" \
-    _gnupg_home="${24}" \
-    _key_fingerprint="${25}" \
-    _key_email="${26}" \
-    _platform="${27}" \
-    _packages=() \
-    _pkgs=() \
-    _get_opts=() \
-    _pub_opts=() \
-    _binary_pkgs=() \
-    _pkg \
-    _pub_repo \
-    _binary_packages_tmp_dir \
-    _source_tmp_dir \
-    _msg=() \
-    _oldpwd
-  shift \
-    27
-  _packages=(
-    "$@"
-  )
-  _oldpwd="$( \
-    pwd)"
-  if [[ "${_package_type}" == "source" && \
-        "${_publishing_platform}" == "fur" ]]; then
-    _msg=(
-      "The fur is a binary package publishing"
-      "platform."
-    )
-    _msg_error \
-      "${_msg[*]}" \
-      1
-  fi
-  if [[ "${_repo_dir}" == "" ]]; then
-    _repo_dir_setup
-  fi
-  _msg_info \
-    "Packages: ${_packages[*]}."
-  for _pkg \
-    in "${_packages[@]}"; do
-    _msg_info \
-      "Package '${_pkg}'."
-    _pub_repo_setup
-    if [[ "${_package_type}" == "binary" ]]; then
-      _binary_packages_tmp_dir_setup
-      _binary_packages_tmp_dir="$( \
-        mktemp \
-          -d)"
-      "_${_origin}_binary_package_get" \
-        "${_repo_dir}" \
-        "${_platform}" || \
-        echo \
-         "no get function for ${_origin}"
-      _get_opts=()
-      "_${_publishing_platform}_get" \
-        "${_pub_repo}" \
-        "${_platform}" || \
-        echo "hi"
-    elif [[ "${_package_type}" == "source" ]]; then
-      if [[ "${_origin}" == "lur" ]]; then
-        if [[ ! -d "${_repo_dir}/lur/${_pkg}" ]]; then
-          _msg=(
-            "found no sources for package"
-            "'${_pkg}' in repo '${_repo_dir}/lur'"
-          )
-          _msg_error \
-            "${_msg[*]}" \
-            1
-	else
-          _source_tmp_dir_setup
-	  _source_prepare \
-	    "${_repo_dir}/lur" \
-	    "${_pkg}" \
-	    "${_source_tmp_dir}"
-        fi
-      fi
+    _origin \
+    _publisher
+  _set_override \
+    "source" \
+    "publisher" \
+    ""
+  _origin="$( \
+    _get \
+      "source" \
+      "origin")"
+  _publisher="$( \
+    _get \
+      "source" \
+      "publisher")"
+  if [[ "${_publisher}" == "" ]]; then
+    if [[ "${_origin}" == "ur" ]]; then
+      _ur_publisher_auto_detect
+    elif [[ "${_origin}" == "gur" ]]; then
+      _publisher="themartiancompany"
+    elif [[ "${_origin}" == "aur" ]]; then
+      _publisher=""
+    elif [[ "${_origin}" == "archlinux" ]]; then
+      _publisher="archlinux"
     fi
-    _pub_opts_setup
-    "_${_publishing_platform}_pub" \
-      "${_pub_opts[@]}"
-  done
-  cd \
-    "${_oldpwd}"
-}
-
-_key_latest_select() {
-  local \
-    _keyserver_receive_dir \
-    _find_opts=() \
-    _keys=() \
-    _keys_sorted=() \
-    _msg=()
-  _keyserver_receive_dir="${HOME}/.cache/evm-openpgp-keyserver/receive"
-  _msg=(
-    "Selecting latest published"
-    "publisher's wallet address key"
-    "retrieved from keyserver."
-  )
-  _msg_info \
-    "${_msg[*]}"
-  _msg=(
-    "looking for own signatures"
-    "in '${_keyserver_receive_dir}'."
-  )
-  _msg_info \
-    "${_msg[*]}"
-  _find_opts+=(
-    -type
-      "f"
-    -iname
-      "${wallet_address}.*.asc"
-    -print0
-  )
-  _msg=(
-    "running find with options"
-    "'${_find_opts[@]}'"
-  )
-  _msg_info \
-    "${_msg[*]}"
-  mapfile \
-    -d \
-    $'\0' \
-    _keys < \
-    <(find \
-        "${_keyserver_receive_dir}" \
-	"${_find_opts[@]}" 2>/dev/null || \
-      true)
-  _keys_sorted=( $( \
-    printf \
-      "%s\n" \
-      "${_keys[@]}" | \
-      sort \
-        -V)
-  )
-  if [[ "${_keys_sorted}" == "" ]]; then
-    _msg=(
-      "No keys in '${_keyserver_receive_dir}',"
-      "create a key with"
-      "'evm-gpg new <your_user_name> <your_full_name>',"
-      "publish it with"
-      "'evm-openpgp-keyserver-publish <your_wallet_address>'"
-      "and then run"
-      "'evm-openpgp-keyserver-receive <your_wallet_address>'."
-    )
-    _msg_error \
-      "${_msg[*]}" \
-      1
   fi
-  _msg_info \
-    "selecting key '${_keys_sorted[-1]}'"
-  _fingerprint="$( \
-    gpg-key-info \
-      -o \
-        "fingerprint" \
-      "${_keys_sorted[-1]}")"
+  _set \
+    "source" \
+    "publisher" \
+    "${_publisher}"
 }
 
-_key_git_select() {
+_work_dir_auto_detect() {
   local \
-    _msg=()
-  _msg=(
-    "using default git signing key"
-  )
-  _msg_info \
-    "${_msg[*]}"
-  _fingerprint="$( \
-    git \
-      config \
-        --list | \
-      grep \
-        signingkey | \
-        awk \
-          -F \
-            "=" \
-          '{print $2}')"
-}
-
-_pgp_fingerprint_auto_detect() {
-  local \
-    _fingerprint
-  if [[ "${publishing_platform}" == "fur" ]]; then
-    _key_git_select
-  elif [[ "${publishing_platform}" == "ur" ]]; then
-    _key_latest_select
-  fi
+    _work_dir
+  _work_dir="${HOME}/.cache/aspe"
+  mkdir \
+    -p \
+    "${_work_dir}"
+  chmod \
+    700 \
+    "${_work_dir}"
   _set_override \
-    "pgp" \
-    "fingerprint" \
-    "${_fingerprint}"
-}
-
-_pgp_email_auto_detect() {
-  local \
-    _email
-  if [[ "${publishing_platform}" == "ur" ]]; then
-    _email=""
-  elif [[ "${publishing_platform}" == "fur" ]]; then
-    _email="$( \
-      git \
-        config \
-          --list | \
-        grep \
-          email | \
-          awk \
-            -F \
-              "=" \
-            '{print $2}')"
-  fi
-  _set_override \
-    "pgp" \
-    "email" \
-    "${_email}"
-}
-
-_platform_auto_detect() {
-  local \
-    _platform="arch" \
-    _os
-  _os="$( \
-    uname \
-      -o)"
-  if [[ "${_os}" == "Android" ]] || \
-     [[ -v "TERMUX_VERSION" ]]; then
-    _platform="termux"
-  fi
-  echo \
-    "${_platform}"
-}
-
-_package_type_auto_detect() {
-  local \
-    _type
-  if [[ "${publishing_platform}" == "fur" ]]; then
-    _type="binary"
-  elif [[ "${publishing_platform}" == "ur" || \
-          "${publishing_platform}" == "gur"  ]]; then
-    _type="source"
-  fi
-  _set_override \
-    "package" \
-    "type" \
-    "${_type}"
+    "work" \
+    "dir" \
+    "${_work_dir}"
 }
 
 # Set defaults and, if present, overrides
-# from arch-grub command line option parameters
+# command line option parameters
 _set_overrides() {
-  local \
-    _msg=()
   if [[ -v override_color ]]; then
     color="${override_color}"
   elif [[ -z "${color}" ]]; then
@@ -1427,12 +1149,18 @@ _set_overrides() {
     quiet="y"
   fi
   _set_override \
-    "publishing" \
+    "get" \
     "date" \
     "$(_get_date_human)"
+  _work_dir_auto_detect
   _set_override \
-    "publishing" \
-    "platform" \
+    "output" \
+    "dir" \
+    "$(realpath \
+         $(pwd))"
+  _set_override \
+    "source" \
+    "origin" \
     "ur"
   _set_override \
     "wallet" \
@@ -1444,284 +1172,204 @@ _set_overrides() {
     "n"
   _deployments_dir_auto_detect \
     "ur" \
-    "${user_level}"
+    "$(_get \
+         "user" \
+         "level")"
   _network_auto_detect \
     "UserRepository" \
-    "${deployments_dir}" \
-    "${user_level}"
+    "$(_get \
+         "deployments" \
+         "dir")" \
+    "$(_get \
+         "user" \
+         "level")"
   _api_key_auto_detect \
-    "${target_network}"
+    "$(_get \
+         "target" \
+         "network")"
   _set_override \
     "wallet" \
     "path" \
     "$(_wallet_path_get \
          "evm-wallet" \
-         "${wallet_name}")"
+         "$(_get \
+              "wallet" \
+              "name")")"
   _secret_auto_detect \
     "seed" \
     "seed" \
     "evm-wallet" \
-    "${wallet_name}"
+    "$(_get \
+         "wallet" \
+         "name")"
   _secret_auto_detect \
     "password" \
     "plain" \
     "evm-wallet" \
-    "${wallet_name}"
+    "$(_get \
+         "wallet" \
+         "name")"
   _set_override \
     "wallet" \
     "address" \
     "$(evm-wallet \
          get \
-	   "${wallet_name}" \
+           "$(_get \
+                "wallet" \
+                "name")" \
            "address")"
-  _set_override \
-    "target" \
-    "publisher" \
-    "${wallet_address}"
-  _set_override \
-    "target" \
-    "price" \
-    "0"
-  _set_override \
-    "measure" \
-    "unit" \
-    "ether"
-  _set_override \
-    "target" \
-    "uri" \
-    ""
-  _set_override \
-    "recipe" \
-    "publish" \
-    "y"
-  _set_override \
-    "package" \
-    "list" \
-    "y"
-  _contract_setup_auto_detect \
+  _contract_version_auto_detect \
+    "$(_get \
+         "deployments" \
+         "dir")" \
+    "UserRepository" \
+    "ur" \
+    "$(_get \
+         "target" \
+         "network")"
+  _contract_address_auto_detect \
     "ur" \
     "UserRepository" \
     "ur" \
-    "${target_network}" \
-    "${user_level}" \
-    "${deployments_dir}"
-  _contract_setup_auto_detect \
-    "ur" \
-    "PackagePublishers" \
-    "pp" \
-    "${target_network}" \
-    "${user_level}" \
-    "${deployments_dir}"
-  _contract_setup_auto_detect \
-    "ur" \
-    "UserRepositoryPublishers" \
-    "up" \
-    "${target_network}" \
-    "${user_level}" \
-    "${deployments_dir}"
-  _set_override \
-    "repo" \
-    "dir" \
-    "${HOME}"
-  _set_override \
-    "repo" \
-    "origin" \
-    "lur"
-  _package_type_auto_detect
-  _set_override \
-    "pub" \
-    "dir" \
-    "${HOME}"
-  _set_override \
-    "cache" \
-    "dir" \
-    "$(_cache_dir_auto_detect)"
-  _set_override \
-    "gnupg" \
-    "home" \
-    "${HOME}/.config/evm-gnupg"
-  _pgp_email_auto_detect
-  _pgp_fingerprint_auto_detect
-  _set_override \
-    "output" \
-    "dir" \
-    "$(pwd)"
+    "$(_get \
+         "target" \
+         "network")" \
+    "$(_get \
+         "ur" \
+         "version")" \
+    "$(_get \
+         "user" \
+         "level")" \
+    "$(_get \
+         "deployments" \
+         "dir")"
+  _source_publisher_auto_detect
   _set_override \
     "target" \
-    "platform" \
-    "$(_platform_auto_detect)"
-  if [[ "${local_packages[*]}" == "" ]]; then
-    local_packages+=(
-      "$(basename \
-        "$(realpath \
-          "$(pwd)")")"
-    )
-    _msg=(
-      "No input package given,"
-      "publishing ${local_packages[*]}"
-    )
-    _msg_info \
-      "${_msg[*]}"
-  fi
+    "revision" \
+    "latest"
+  _set_override \
+    "retrieve" \
+    "force" \
+    "n"
+  _set_override \
+    "verify" \
+    "skip" \
+    "n"
 }
+
 
 # Show help usage, with an exit status.
 # $1: exit status number.
 _usage() {
   local \
-    _ur \
-    _ur_deployment \
-    _networks \
+    _exit="${1}" \
+    _deployment \
+    _networks=() \
     _usage_text
-  _ur="UserRepository"
-  _ur_deployment="$( \
+  _deployment="$( \
     _get \
       "deployments" \
-      "dir")/${_ur}"
-  _networks="$( \
+      "dir")/UserRepository"
+  _networks=( $( \
     evm-contract-deployment-networks \
       -A \
-      "${_ur_deployment}")"
-  local \
-    _usage_text
+      "${_deployment}")
+  )
   IFS='' \
     read \
       -r \
       -d '' \
       _usage_text << \
         ENDUSAGETEXT || true
-
-Build recipes and binary packages publisher tool.
+Build recipes retrieval tool.
 
 Usage:
   $(_get "app" "name")
     [options]
     [packages]
 
-  networks:
+networks:
 $(_display_networks \
-     "${_networks[*]}")
+     "${_networks[@]}")
 
   options:
-     -A <ur_address>           Address of the 'User Repository'
-                               contract on the network.
-                               Default: ${ur_address}
-     -B <up_address>           Address of the 'User Repository
-                               Publishers' contract on the
-                               network.
-                               Default: ${up_address}
-     -C <pp_address>           Address of the 'Package Publishers'
-                               contract on the network.
-                               Default: ${pp_address}
-     -V <ur_version>           Version of the target 'User Repository
-                               Publishers' contract.
-                               Default: ${ur_version}
-     -u                        Whether to retrieve publishers' contract
-                               address from user directory or custom
-                               deployment.
-                               Default: ${user_level}
-     -d <deployments_dir>      Contracts deployments directory.
-                               Default: ${deployments_dir}
-     -N <wallet_name>          Wallet name.
-                               Default: ${wallet_name}
-     -w <wallet_path>          Wallet path.
-                               Default: ${wallet_path}
-     -p <wallet_password>      Wallet password.
-                               Default: ${wallet_password}
-     -s <wallet_seed>          Wallet seed path.
-                               Default: ${wallet_seed}
-     -n <network>              EVM network name (${_networks[*]}).
-                               Default: ${target_network}
-     -k <api_key>              Etherscan-like service key.
-                               Default: ${api_key}
-     -W <repo_dir>             Repo directory.
-                               Default: ${repo_dir}
-     -S <origin>               Repo origin.
-                               Default: ${repo_origin}
-     -D <publishing_platform>  Publishing platform.
-                               It can be 'ur', 'gur', 'fur'.
-                               Default: ${publishing_platform}
-     -P <target_publisher>     Target publisher.
-                               It's 'themartiancompany' for
-                               gur' and 'fur' and user's
-                               wallet address for 'ur'.
-                               Default: ${target_publisher}
-     -M <target_price>         Target price for the package.
-                               Default: ${target_price}
-     -m <measure_unit>         Measure unit for the network
-                               currency. It can be 'ether'
-                               and 'wei'.
-                               Default: ${measure_unit}
-     -U <target_uri>           To manually specify the signed
-                               package recipe archive evmfs URI
-                               and skip upload.
-                               Default: ${target_uri}
-     -R <y/n>                  If set to 'y', it will skip
-                               recipe publishing.
-                               Default: ${recipe_publish}
-     -L <y/n>                  Whether to list package
-                               for user search. Requires to
-			       be a registered Ur publisher.
-                               Default: ${package_list}
-     -H <gnupg_home>           GNUPG home directory.
-                               Default: ${gnupg_home}
-     -K <fingerprint>          OpenPG signature key.
-                               Default: ${pgp_fingerprint}
-     -E <email_like_id>        OpenPG signature email.
-                               Default: ${pgp_email}
-     -O <computing_platform>   Life or DogeOS base platform for
-                               which the binary package is built
-                               ('arch', 'termux').
-                               Default: ${target_platform}
-     -o <output_dir>           Output directory.
-                               Default: ${output_dir}
+     -S <origin>            Source origin ('ur', 'gur', 'archlinux',
+                            'aur').
+			    Default: ${source_origin}
+     -P <publisher>         Source publisher. Valid for origins
+                            are 'ur' and 'gur'. For 'gur'it defaults to
+                            'themartiancompany', for 'ur' to the
+                            kirsh trusted Ur publisher.
+			    Default: ${source_publisher}
+     -W <work_dir>          Work directory.
+			    Default: ${output_dir}
+     -o <output_dir>        Output directory.
+			    Default: ${output_dir}
+     -r <revision>          Target recipe revision to retrieve.
+			    Default: ${target_revision}
+     -A <ur_address>        Address of the UserRepository
+                            contract on the network.
+                            Default: ${ur_address}
+     -V <ur_version>        Version of the target UserRepository
+                            contract.
+                            Default: ${ur_version}
+     -u                     Whether to retrieve user repository
+                            address from user directory or custom
+                            deployment.
+                            Default: ${user_level}
+     -d <deployments_dir>   Contracts deployments directory.
+                            Default: ${deployments_dir}
+     -N <wallet_name>       Wallet name.
+                            Default: ${wallet_name}
+     -w <wallet_path>       Wallet path.
+                            Default: ${wallet_path}
+     -p <wallet_password>   Wallet password.
+                            Default: ${wallet_password}
+     -s <wallet_seed>       Wallet seed path.
+                            Default: ${wallet_seed}
+     -n <network>           EVM network name (${_networks[*]}).
+                            Default: ${target_network}
+     -k <api_key>           Etherscan-like service key.
+                            Default: ${api_key}
+     -f                     If enabled attempts to retrieve the
+                            source from any of the available
+			    sources.
+                            Default: ${retrieve_force}
 
-     -c                        Colors.
-     -h                        This message.
-     -v                        Enable verbose output
+     -c                     Colors.
+     -h                     This message.
+     -v                     Enable verbose output
 ENDUSAGETEXT
   _printf \
     '%s\n' \
     "${_usage_text}"
   exit \
-    "${1}"
+    "${_exit}"
 }
 
 # Shows configuration options.
 _show_config() {
   _msg_info "${app_name} configuration"
-  _msg_info "            Publishing date:   ${publishing_date}"
-  _msg_info "               Package type:   ${package_type}"
-  _msg_info "                Repo origin:   ${repo_origin}"
-  _msg_info "             Repo directory:   ${repo_dir}"
-  _msg_info "        Publishing platform:   ${publishing_platform}"
-  _msg_info "    User Repository address:   ${ur_address}"
-  _msg_info "    User Repository version:   ${ur_version}"
-  _msg_info "      Ur Publishers address:   ${up_address}"
-  _msg_info " Package Publishers address:   ${pp_address}"
-  _msg_info "                 User level:   ${user_level}"
-  _msg_info "      Deployments directory:   ${deployments_dir}"
-  _msg_info "             Wallet address:   ${wallet_address}"
-  _msg_info "                Wallet name:   ${wallet_name}"
-  _msg_info "                Wallet path:   ${wallet_path}"
-  _msg_info "            Wallet password:   ${wallet_password}"
-  _msg_info "                Wallet seed:   ${wallet_seed}"
-  _msg_info "             Target network:   ${target_network}"
-  _msg_info "                    API key:   ${api_key}"
-  _msg_info "            Cache directory:   ${cache_dir}"
-  _msg_info "       Publishing directory:   ${pub_dir}"
-  _msg_info "           Target publisher:   ${target_publisher}"
-  _msg_info "            GNUPG directory:   ${gnupg_home}"
-  _msg_info "            Target platform:   ${target_platform}"
-  _msg_info "              Signature key:   ${pgp_fingerprint}"
-  _msg_info "            Signature email:   ${pgp_email}"
-  _msg_info "               Target price:   ${target_price}"
-  _msg_info "               Measure unit:   ${measure_unit}"
-  _msg_info "          Target recipe URI:   ${target_uri}"
-  _msg_info "             Recipe publish:   ${recipe_publish}"
-  _msg_info "               List package:   ${package_list}"
-  _msg_info "                   Packages:   ${local_packages[*]}"
-  _msg_info "           Output directory:   ${output_dir}"
+  _msg_info "                       Get date:   ${get_date}"
+  _msg_info "                  Source origin:   ${source_origin}"
+  _msg_info "               Source publisher:   ${source_publisher}"
+  _msg_info "                Target revision:   ${target_revision}"
+  _msg_info "                 Work directory:   ${work_dir}"
+  _msg_info "               Output directory:   ${output_dir}"
+  _msg_info "                     Ur address:   ${ur_address}"
+  _msg_info "                     Ur version:   ${ur_version}"
+  _msg_info "                     User level:   ${user_level}"
+  _msg_info "          Deployments directory:   ${deployments_dir}"
+  _msg_info "                    Wallet name:   ${wallet_name}"
+  _msg_info "                    Wallet path:   ${wallet_path}"
+  _msg_info "                Wallet password:   ${wallet_password}"
+  _msg_info "                    Wallet seed:   ${wallet_seed}"
+  _msg_info "                 Target network:   ${target_network}"
+  _msg_info "                        API key:   ${api_key}"
+  _msg_info "                 Force retrieve:   ${retrieve_force}"
+  _msg_info "    Skip signature verification:   ${verify_skip}"
+  _msg_info "                       Packages:   ${pkgs[@]}"
 }
 
 _globals
@@ -1731,11 +1379,15 @@ _requirements
 # shellcheck disable=SC2034
 while \
   getopts \
-    't:A:V:ud:N:w:p:s:n:k:C:S:D:P:M:m:U:R:L:H:K:E:W:o:O:cvh?' \
+    'S:P:W:o:r:A:V:ud:N:w:p:s:n:k:fUcvh?' \
     arg; do
   case \
     "${arg}" in
-    t) override_package_type="${OPTARG}" ;;
+    S) override_source_origin="${OPTARG}" ;;
+    P) override_source_publisher="${OPTARG}" ;;
+    W) override_work_dir="${OPTARG}" ;;
+    o) override_output_dir="${OPTARG}" ;;
+    r) override_target_revision="${OPTARG}" ;;
     A) override_ur_address="${OPTARG}" ;;
     V) override_ur_version="${OPTARG}" ;;
     u) override_user_level="y" ;;
@@ -1746,21 +1398,8 @@ while \
     s) override_wallet_seed="${OPTARG}" ;;
     n) override_target_network="${OPTARG}" ;;
     k) override_api_key="${OPTARG}" ;;
-    C) override_repo_dir="${OPTARG}" ;;
-    S) override_repo_origin="${OPTARG}" ;;
-    D) override_publishing_platform="${OPTARG}" ;;
-    P) override_target_publisher="${OPTARG}" ;;
-    M) override_target_price="${OPTARG}" ;;
-    m) override_measure_unit="${OPTARG}" ;;
-    U) override_target_uri="${OPTARG}" ;;
-    R) override_recipe_publish="${OPTARG}" ;;
-    L) override_package_list="${OPTARG}" ;;
-    H) override_gnupg_home="${OPTARG}" ;;
-    K) override_pgp_fingerprint="${OPTARG}" ;;
-    E) override_pgp_email="${OPTARG}" ;;
-    W) override_pub_dir="${OPTARG}" ;;
-    o) override_output_dir="${OPTARG}" ;;
-    O) override_target_platform="${OPTARG}" ;;
+    f) override_retrieve_force="y" ;;
+    U) override_verify_skip="y" ;;
     c) override_color="y" ;;
     v) override_quiet="n" ;;
     h|?) _set_overrides && \
@@ -1780,19 +1419,20 @@ shift \
   $(( \
     OPTIND - 1 \
   ))
-local_packages=(
-  $@
+pkgs+=(
+  "$@"
 )
-_config_user_init \
-  "${app_name}"
+if (( $# < 1 )); then
+  _msg_error \
+    "No packages specified" \
+    0
+  _usage \
+    1
+fi
 _set_overrides
-_show_config
-app_opts=(
-  "${package_type}"
+app_opts+=(
   "${ur_address}"
   "${ur_version}"
-  "${up_address}"
-  "${pp_address}"
   "${deployments_dir}"
   "${wallet_name}"
   "${wallet_path}"
@@ -1800,22 +1440,15 @@ app_opts=(
   "${wallet_seed}"
   "${target_network}"
   "${api_key}"
-  "${cache_dir}"
+  "${retrieve_force}"
+  "${verify_skip}"
+  "${source_origin}"
+  "${source_publisher}"
+  "${target_revision}"
+  "${work_dir}"
   "${output_dir}"
-  "${repo_dir}"
-  "${repo_origin}"
-  "${publishing_platform}"
-  "${target_publisher}"
-  "${target_price}"
-  "${measure_unit}"
-  "${target_uri}"
-  "${recipe_publish}"
-  "${package_list}"
-  "${gnupg_home}"
-  "${pgp_fingerprint}"
-  "${pgp_email}"
-  "${target_platform}"
-  "${local_packages[@]}"
+  "${pkgs[@]}"
 )
-_evm_source_contract_get \
+_show_config
+_aspe \
   "${app_opts[@]}"

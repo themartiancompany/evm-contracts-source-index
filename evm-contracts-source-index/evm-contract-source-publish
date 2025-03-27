@@ -102,6 +102,7 @@ _global_variables() {
   source_publish=""
   contract_address=""
   contract_source=""
+  deployment_transaction=""
   evm_version=""
   target_compiler=""
   compiler_version=""
@@ -435,9 +436,10 @@ _evm_contract_source_publish() {
     _contract_network="${16}" \
     _contract_address="${17}" \
     _contract_source="${18}" \
-    _evm_version="${19}" \
-    _target_compiler="${20}" \
-    _compiler_version="${21}" \
+    _deployment_transaction="${19}" \
+    _evm_version="${20}" \
+    _target_compiler="${21}" \
+    _compiler_version="${22}" \
     _msg=() \
     _contract_dir \
     _contract_name \
@@ -507,8 +509,9 @@ _evm_contract_source_publish() {
       "'${_target_publisher}' posting"
       "source code '${_contract_source}'"
       "for '${_contract_name}' contract"
-      "on network '${_contract_network}'"
-      "and address '${_contract_address}',"
+      "deployed on network '${_contract_network}'"
+      "at transaction '${_deployment_transaction}'"
+      "with address '${_contract_address}',"
       "pointing to EVMFS URI '${_source_uri}',"
       "set to be built for EVM version"
       "'${_evm_version}', compiler"
@@ -526,6 +529,7 @@ _evm_contract_source_publish() {
       "${_contract_network}" \
       "${_contract_address}" \
       "${_source_uri}" \
+      "${_deployment_transaction}" \
       "${_evm_version}" \
       "${_target_compiler}" \
       "${_compiler_version}"
@@ -838,6 +842,7 @@ Usage:
     <contract_network>
     <contract_address>
     <contract_source>
+    <deployment_transaction>
     <evm_version>
     <compiler>
     <compiler_version>
@@ -1010,7 +1015,7 @@ if (( $# < 3 )); then
 fi
 if (( $# < 4 )); then
   _msg_error \
-    "No EVM version specified." \
+    "No deployment transaction hash given." \
     0
   _set_overrides
   _usage \
@@ -1018,13 +1023,22 @@ if (( $# < 4 )); then
 fi
 if (( $# < 5 )); then
   _msg_error \
+    "No EVM version specified." \
+    0
+  _set_overrides
+  _usage \
+    1
+fi
+
+if (( $# < 6 )); then
+  _msg_error \
     "No compiler specified." \
     0
   _set_overrides
   _usage \
     1
 fi
-if (( $# < 6 )); then
+if (( $# < 7 )); then
   _msg_error \
     "No compiler version specified." \
     0
@@ -1035,9 +1049,10 @@ fi
 contract_network="${1}"
 contract_address="${2}"
 contract_source="${3}"
-evm_version="${4}"
-target_compiler="${5}"
-compiler_version="${6}"
+deployment_transaction="${4}"
+evm_version="${5}"
+target_compiler="${6}"
+compiler_version="${7}"
 _config_user_init \
   "${app_name}"
 _set_overrides
@@ -1061,6 +1076,7 @@ app_opts=(
   "${contract_network}"
   "${contract_address}"
   "${contract_source}"
+  "${deployment_transaction}"
   "${evm_version}"
   "${target_compiler}"
   "${compiler_version}"
