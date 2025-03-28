@@ -92,34 +92,23 @@ _global_variables() {
 _contract_call_opts_setup() {
   local \
     _msg=() \
-    _evm_contract_call_opts=() \
-    _ur_call_opts=()
+    _evm_contract_call_opts=()
   _evm_contract_call_opts+=(
     -n
       "${_target_network}"
     -k
       "${_api_key_path}"
   )
-  _ur_call_opts+=(
+  _si_call_opts+=(
     "${_evm_contract_call_opts[@]}"
     -A
-      "${_ur_abi}"
+      "${_si_abi}"
     -B
-      "${_ur_bytecode}"
+      "${_si_bytecode}"
     -C
-      "${_ur_compiler_output}"
-  )
-  _validate_call_opts+=(
-    "${_ur_call_opts[@]}"
+      "${_si_compiler_output}"
     -t
       "static"
-  )
-  _retrieve_call_opts+=(
-    "${_ur_call_opts[@]}"
-    -t
-      "static"
-    -N
-      "${_wallet_name}"
   )
 }
 
@@ -700,10 +689,64 @@ _revision_validate() {
   fi
 }
 
-_publisher_discover() {
-  
+_publisher_get() {
+  local \
+    _publisher_no="${1}"
   evm-contract-call \
-    
+    "${_si_call_opts[@]}" \
+    "${_si_address}" \
+    "sourcePublisher" \
+    "${_contract_network}" \
+    "${_contract_address}" \
+    "${_publisher_no}"
+}
+
+_publisher_discover() {
+  local \
+    _publishers_amount \
+    _locked \
+    _tx_deployment \
+    _publisher \
+    _publisher_no \
+    _msg=()
+  _publisher_no="0"
+  _publisher="$( \
+    _publisher_get \
+      "${_publisher_no}")"
+  if [[ "${_publisher}" == "" ]]; then
+    _msg=(
+      "Nobody has published the source"
+      "for this contract."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+  _publisher="$( \
+    evm-contract-call \
+      "${_si_call_opts[@]}" \
+      "${_si_address}" \
+      "publisherNo" \
+      "${_contract_network}" \
+      "${_contract_address}")"
+
+  _publishers_amount="$( \
+    evm-contract-call \
+      "${_si_call_opts[@]}" \
+      "${_si_address}" \
+      "publisherNo" \
+      "${_contract_network}" \
+      "${_contract_address}")"
+  
+  _locked="$( \
+    evm-contract-call \
+      "${_si_call_opts[@]}" \
+      ""
+
+  _tx_deployment="$( \
+    evm-contract-call \
+      "${_si_call_opts[@]}" \
+      ""
 }
 
 _evm_contract_source_get() {
@@ -724,9 +767,7 @@ _evm_contract_source_get() {
     _output_type="${14}" \
     _output_dir="${15}" \
     _output_file="${16}" \
-    _validate_call_opts=() \
-    _retrieve_call_opts=() \
-    _ur_publishers_opts=() \
+    _si_call_opts=() \
     _cache_dir \
     _si_abi \
     _si_bytecode \
@@ -744,7 +785,7 @@ _evm_contract_source_get() {
     "SourceIndex" \
     "_si" \
     "${_si_version}"
-  # TODO: discover target publisher
+  _contract_call_opts_setup 
   if [[ "${_publisher}" == "" ]]; then
     _publisher_discover
   fi
@@ -760,7 +801,6 @@ _evm_contract_source_get() {
     _msg_info \
       "${_msg[*]}"
   fi
-  _contract_call_opts_setup 
   _revision_latest_get \
     "${_ur_address}" \
     "${_publisher}" \
