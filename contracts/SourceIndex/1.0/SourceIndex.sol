@@ -434,7 +434,7 @@ contract SourceIndex {
       address _contractAddress)
     public
     view
-    returns (string memory)
+    returns (bytes32)
     {
       checkLocked(
         _publisher,
