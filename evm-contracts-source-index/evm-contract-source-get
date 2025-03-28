@@ -689,6 +689,51 @@ _revision_validate() {
   fi
 }
 
+_tx_deployment_get() {
+  local \
+    _publisher="${1}"
+  evm-contract-call \
+    "${_si_call_opts[@]}" \
+    "${_si_address}" \
+    "deploymentTransaction" \
+    "${_publisher}" \
+    "${_contract_network}" \
+    "${_contract_address}"
+}
+
+_deployer_discover() {
+  local \
+    _publisher="${1}" \
+    _evm_contract_deployer_get_opts=() \
+    _tx_deployment \
+    _tx_null \
+    _msg=()
+  _tx_null="0x0000000000000000000000000000000000000000000000000000000000000000"
+  _tx_deployment="$( \
+    _tx_deployment_get \
+      "${_publisher}")"
+  _evm_contract_deployer_get_opts+=(
+    -n
+      "${contract_network}"
+  )
+  if [[ "${_tx_deployment}" == "${_tx_null}" ]]; then
+    _msg=(
+      "No deployment transaction attached to"
+      "publisher '${_pubisher}' reported"
+      "contracts' sources."
+    )
+    _msg_info \
+      "${_msg[*]}"
+  elif [[ "${_tx_deployment}" != "${_tx_null}" ]]; then
+    _deployer="$( \
+      evm-contract-deployer-get \
+        "${_evm_contract_deployer_get_opts[@]}" \
+        "${_contract_address}" \
+	"${_tx_deployment}")"
+  fi
+  # well continue when i wake up
+}
+
 _publisher_get() {
   local \
     _publisher_no="${1}"
@@ -701,20 +746,21 @@ _publisher_get() {
     "${_publisher_no}"
 }
 
-_publisher_discover() {
+_publisher_auto_detect() {
   local \
     _publishers_amount \
     _locked \
     _tx_deployment \
     _publisher \
     _publisher_no \
+    _address_null \
     _msg=()
   _publisher_no="0"
   _publisher="$( \
     _publisher_get \
       "${_publisher_no}")"
   _address_null="0x0000000000000000000000000000000000000000"
-  if [[ "${_publisher}" == "" ]]; then
+  if [[ "${_publisher}" == "${_address_null}" ]]; then
     _msg=(
       "Nobody has published the source"
       "for this contract."
@@ -788,7 +834,7 @@ _evm_contract_source_get() {
     "${_si_version}"
   _contract_call_opts_setup 
   if [[ "${_publisher}" == "" ]]; then
-    _publisher_discover
+    _publisher_auto_detect
   fi
   # _publisher_dir="${_work_dir}/${_publisher}
   # _publisher_dir_setup \
