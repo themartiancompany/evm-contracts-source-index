@@ -56,17 +56,19 @@ _requirements() {
     'evm-wallet'
   _check_cmd \
     'evmfs'
-  _check_cmd \
-    'ur-publishers' \
-    'ur'
+  # For when spammers of contracts
+  # their authors will leave unverified
+  # will appear.
+  # _check_cmd \
+  #   'ur-publishers' \
+  #   'ur'
 }
 
 # shellcheck disable=SC2034
 _global_variables() {
-  pkgs=()
   get_date=""
-  ur_address=""
-  ur_version=""
+  si_address=""
+  si_version=""
   wallet_name=""
   wallet_path=""
   wallet_password=""
@@ -74,122 +76,17 @@ _global_variables() {
   wallet_address=""
   target_network=""
   api_key=""
-  retrieve_force=""
-  verify_skip=""
   deployments_dir=""
   user_level=""
-  source_origin=""
   source_publisher=""
-  target_revision=""
+  contract_network=""
+  contract_address=""
   output_dir=""
+  output_type=""
+  output_file=""
   work_dir=""
   color=""
   quiet=""
-}
-
-# Get source from a selected origin
-# $1: origin (archlinux,
-#             aur,
-#             gur)
-_git_repo_uri_get() {
-  local \
-    _origin="${1}" \
-    _publisher="${2}" \
-    _pkg="${3}" \
-    _http \
-    _ns
-  _ns="${_publisher}"
-  if [[ "${_origin}" == "archlinux" ]]; then
-    _http='https://gitlab.archlinux.org'
-    echo \
-      "${_http}/${_ns}/packaging/packages/${_pkg}"
-  elif [[ "${_origin}" == "aur" ]]; then
-    _http='https://aur.archlinux.org'
-    echo \
-      "${_http}/${_pkg}"
-  elif [[ "${_origin}" == "gur" ]]; then
-    _http="http://github.com"
-    _ns="${_publisher}"
-    echo \
-      "${_http}/${_ns}/${_pkg}-ur"
-  fi
-}
-
-_clone_validate() {
-  local \
-    _pkg_dir="${1}" \
-    _msg=() \
-    _git_opts=()
-  _git_opts+=(
-    -C
-      "${_pkg_dir}"
-  )
-  if [[ ! -d "${_pkg_dir}" ]]; then
-    _msg=(
-      "Cloning into '${_pkg_dir}'"
-      "failed."
-    )
-    _msg_warning \
-      "${_msg[*]}"
-  fi
-  _commit_last="$( \
-    git \
-      "${_git_opts[@]}" \
-      rev-parse \
-        HEAD 2>/dev/null || \
-    true)"
-
-  if [[ "${_commit_last}" == "" ]]; then
-    _msg=(
-      "Repository not cloned."
-    )
-    _msg_warning \
-      "${_msg[*]}"
-  elif [[ "${_commit_last}" == "HEAD" ]]; then
-    _msg=(
-      "Cloned an empty repository,"
-      "deleting."
-    )
-    _msg_warning \
-      "${_msg[*]}"
-    rm \
-      -rf \
-      "${_pkg_dir}"
-  elif [[ "${_commit_last}" != "HEAD" && \
-	  "${_commit_last}" != "" ]]; then
-    _retrieved="true"
-    unset \
-      GIT_TERMINAL_PROMPT
-  fi
-}
-
-_git_clone() {
-  local \
-    _origin="${1}" \
-    _publisher="${2}" \
-    _pkg_dir="${3}" \
-    _pkg="${4}" \
-    _clone_opts=() \
-    _uri
-  if [[ "${quiet}" == "y" ]]; then
-    _clone_opts+=(
-      --quiet
-    )
-  fi
-  _uri="$( \
-    _git_repo_uri_get \
-      "${_origin}" \
-      "${_publisher}" \
-      "${_pkg}")"
-  GIT_TERMINAL_PROMPT=0 \
-  git \
-    clone \
-      "${_clone_opts[@]}" \
-      "${_uri}" \
-      "${_pkg_dir}" || \
-    true
-  _clone_validate \
-    "${_pkg_dir}"
 }
 
 _contract_call_opts_setup() {
@@ -587,7 +484,7 @@ _signature_author_verify() {
   fi
   if [[ "${_author}" == "" ]]; then
     _msg=(
-      "archive '${_archive}' is"
+      "Archive '${_archive}' is"
       "missing an author."
     )
     _msg_error \
@@ -596,7 +493,7 @@ _signature_author_verify() {
   fi
   if [[ "${_author}" != *"@${_publisher}" ]]; then
     _msg=(
-      "archive '${_archive}' is signed"
+      "Archive '${_archive}' is signed"
       "by '${_author#*@}' while it should"
       "be signed by '${_publisher}'."
     )
@@ -697,7 +594,7 @@ _archive_contents_read() {
   done
   if [[ "${_archive_contents[*]}" == "" ]]; then
     _msg=(
-      "corrupted or empty archive '${_archive}'."
+      "Corrupted or empty archive '${_archive}'."
     )
     _msg_error \
       "${_msg[*]}" \
@@ -787,14 +684,14 @@ _revision_validate() {
     _msg=()
   if (( "${_revision}" < "${_revision_latest}" )); then
     _msg=(
-      "getting revision '${_revision}',"
+      "Getting revision '${_revision}',"
       "while latest is '${_revision_latest}'."
     )
     _msg_warning \
       "${_msg[*]}"
   elif (( "${_revision}" > "${_revision_latest}" )); then
     _msg=(
-      "trying to get revision '${_revision}',"
+      "Trying to get revision '${_revision}',"
       "while latest is '${_revision_latest}'."
     )
     _msg_error \
@@ -803,48 +700,65 @@ _revision_validate() {
   fi
 }
 
-_ur_get() {
+_publisher_discover() {
+  
+  evm-contract-call \
+    
+}
+
+_evm_contract_source_get() {
   local \
-    _target_network="${1}" \
-    _ur_address="${2}" \
-    _publisher="${3}" \
-    _ur_abi="${4}" \
-    _ur_bytecode="${5}" \
-    _ur_compiler_output="${6}" \
-    _pkg_dir="${7}" \
-    _pkg="${8}" \
-    _revision="${9}" \
-    _verify_skip="${10}" \
+    _si_address="${1}" \
+    _si_version="${2}" \
+    _deployments_dir="${3}" \
+    _wallet_name="${4}" \
+    _wallet_path="${5}" \
+    _wallet_password="${6}" \
+    _wallet_seed="${7}" \
+    _target_network="${8}" \
+    _api_key_path="${9}" \
+    _publisher="${10}" \
+    _contract_network="${11}" \
+    _contract_address="${12}" \
+    _work_dir="${13}" \
+    _output_type="${14}" \
+    _output_dir="${15}" \
+    _output_file="${16}" \
     _validate_call_opts=() \
     _retrieve_call_opts=() \
     _ur_publishers_opts=() \
-    _recipe_archive_uri \
-    _recipe_archive \
-    _revision_latest \
+    _cache_dir \
+    _si_abi \
+    _si_bytecode \
+    _si_compiler_output \
+    _source_archive_uri \
+    _source_archive \
+    _publisher_latest \
     _gnupg_home \
     _msg=()
-  _pkg_dir_setup \
-    "${_pkg_dir}"
-  _recipe_archive="${_pkg_dir}/${_pkg}.tar.xz"
-  if [[ "${_verify_skip}" == "n" ]]; then
-    _recipe_archive+=".gpg"
-    _gnupg_home="${HOME}/.cache/ur/publishers/gnupg"
-    if [[ ! -e "${_gnupg_home}" ]]; then
-      _msg=(
-        "User Repository publishers database"
-	"does not exist. Running 'ur-publishers update'."
-      )
-      _msg_info \
-        "${_msg[*]}"
-      if [[ "${quiet}" == "n" ]]; then
-        _ur_publishers_opts+=(
-	  -v
-        )
-      fi
-      ur-publishers \
-        "${_ur_publishers_opts[@]}" \
-        update
-    fi
+  _cache_dir="$( \
+    _cache_dir_get)"
+  _contract_artifacts_auto_detect \
+    "${_deployments_dir}" \
+    "${_target_network}" \
+    "SourceIndex" \
+    "_si" \
+    "${_si_version}"
+  # TODO: discover target publisher
+  if [[ "${_publisher}" == "" ]]; then
+    _publisher_discover
+  fi
+  # _publisher_dir="${_work_dir}/${_publisher}
+  # _publisher_dir_setup \
+  #    "${_publisher_dir}"
+  _source_archive="${_publisher_dir}/${_contract_address}.tar.xz.gpg"
+  _gnupg_home="${_cache_dir}/gnupg"
+  if [[ ! -e "${_gnupg_home}" ]]; then
+    _msg=(
+      "Source Index publishers keyring does not exist."
+    )
+    _msg_info \
+      "${_msg[*]}"
   fi
   _contract_call_opts_setup 
   _revision_latest_get \
@@ -885,71 +799,6 @@ _ur_get() {
   _retrieved="true"
 }
 
-_source_get_opts() {
-  local \
-    _origin="${1}" 
-  if [[ "${_origin}" == "ur" ]]; then
-    _cmd=(
-      "_ur_get"
-    )
-    _cmd_args=(
-      "${_target_network}"
-      "${_ur_address}"
-      "${_publisher}"
-      "${_ur_abi}"
-      "${_ur_bytecode}"
-      "${_ur_compiler_output}"
-      "${_pkg_dir}"
-      "${_pkg}"
-      "${_revision}"
-      "${_verify_skip}"
-    )
-  else
-    _check_cmd \
-      'git'
-    _cmd=(
-      "_git_clone"
-    )
-    _cmd_args=(
-      "${_origin}"
-      "${_publisher}"
-      "${_pkg_dir}"
-      "${_pkg}"
-    )
-  fi
-}
-
-_origin_validate() {
-  local \
-    _target_origin="${1}"
-  if [[ " ${_origins[*]} " != *" ${_target_origin}"* ]]; then
-    _msg_error \
-      "unknown origin '${_target_origin}'." \
-      1
-  fi
-}
-
-_origins_sort() {
-  local \
-    _target_origin="${1}" \
-    _origins_new=() \
-    _origin
-  _origins_new+=(
-    "${_target_origin}"
-  )
-  for _origin in \
-    "${_origins[@]}"; do
-    if [[ "${_origin}" != "${_target_origin}" ]]; then
-      _origins_new+=(
-        "${_origin}"
-      )
-    fi
-  done
-  _origins=(
-    "${_origins_new[@]}"
-  )
-}
-
 _pkg_dir_setup() {
   local \
     _dir="${1}"
@@ -966,7 +815,7 @@ _work_dir_check() {
     _msg=()
   if [[ ! -d "${_work_dir}" ]]; then
     _msg=(
-      "work directory '${_work_dir}'"
+      "Work directory '${_work_dir}'"
       "does not exist."
     )
     _msg_error \
@@ -975,164 +824,70 @@ _work_dir_check() {
   fi
 }
 
-_aspe() {
-  local \
-    _ur_address="${1}" \
-    _ur_version="${2}" \
-    _deployments_dir="${3}" \
-    _wallet_name="${4}" \
-    _wallet_path="${5}" \
-    _wallet_password="${6}" \
-    _wallet_seed="${7}" \
-    _target_network="${8}" \
-    _api_key_path="${9}" \
-    _retrieve_force="${10}" \
-    _verify_skip="${11}" \
-    _origin="${12}" \
-    _publisher="${13}" \
-    _revision="${14}" \
-    _work_dir="${15}" \
-    _output_dir="${16}" \
-    _pkgs=() \
-    _origin \
-    _origins=() \
-    _pkg_dir \
-    _recipe_dir \
-    _retrieved \
-    _ur_abi \
-    _ur_bytecode \
-    _ur_compiler_output \
-    _cmd=() \
-    _cmd_args=() \
-    _msg=()
-  shift \
-    16
-  _pkgs=(
-    "$@"
-  )
-  _work_dir_check
-  _origins=(
-    "ur"
-    "gur"
-    "aur"
-    "archlinux"
-  )
-  _origin_validate \
-    "${_origin}"
-  _origins_sort \
-    "${_origin}"
-  _contract_artifacts_auto_detect \
-    "${_deployments_dir}" \
-    "${_target_network}" \
-    "UserRepository" \
-    "_ur" \
-    "${_ur_version}"
-  for _pkg in "${_pkgs[@]}"; do
-    _retrieved="false"
-    _pkg_dir="${_work_dir}/${_pkg}"
-    for _origin in "${_origins[@]}"; do
-      _source_get_opts \
-        "${_origin}"
-      "${_cmd[@]}" \
-        "${_cmd_args[@]}"
-      if [[ "${_retrieved}" == "true" ]]; then
-	if [[ "${_origin}" == "ur" ]]; then
-          _recipe_dir="${_pkg_dir}/${_pkg}" 
-	else
-          _recipe_dir="${_pkg_dir}" 
-	fi
-        mv \
-          "${_recipe_dir}" \
-	  "${_output_dir}"
-        break
-      fi
-      if [[ "${_retrieve_force}" == "n" ]]; then
-        break
-      fi
-    done
-    if [[ "${_retrieved}" == "false" ]]; then
-      _msg=(
-        "Error retrieving '${_pkg}'"
-        "sources."
-      )
-      _msg_error \
-        "${_msg[*]}" \
-        1
-    elif [[ "${_retrieved}" == "true" ]]; then
-      _msg=(
-        "Build sources for '${_pkg}'"
-        "correctly retrieved."
-      )
-      _msg_info \
-        "${_msg[*]}"
-    fi
-  done
-}
-
-_ur_publisher_auto_detect() {
+_contract_deployer_auto_detect() {
   local \
     _msg=()
   _msg=(
-    "Ur publisher not specified,"
-    "retrieving own package recipe"
-    "if published."
+    "Source publisher not specified,"
+    "attempting to retrieve the source"
+    "published from the contract deployer."
   )
   _msg_warning \
     "${_msg[*]}"
-  _publisher="$( \
-    evm-wallet \
-     get \
-       "${wallet_name}" \
-       "address")"
-}
-
-_source_publisher_auto_detect() {
-  local \
-    _origin \
-    _publisher
-  _set_override \
-    "source" \
-    "publisher" \
-    ""
-  _origin="$( \
-    _get \
-      "source" \
-      "origin")"
-  _publisher="$( \
-    _get \
-      "source" \
-      "publisher")"
-  if [[ "${_publisher}" == "" ]]; then
-    if [[ "${_origin}" == "ur" ]]; then
-      _ur_publisher_auto_detect
-    elif [[ "${_origin}" == "gur" ]]; then
-      _publisher="themartiancompany"
-    elif [[ "${_origin}" == "aur" ]]; then
-      _publisher=""
-    elif [[ "${_origin}" == "archlinux" ]]; then
-      _publisher="archlinux"
-    fi
-  fi
-  _set \
-    "source" \
-    "publisher" \
-    "${_publisher}"
+  # TODO: write it.
 }
 
 _work_dir_auto_detect() {
   local \
-    _work_dir
-  _work_dir="${HOME}/.cache/aspe"
+    _cache_dir \
+    _dir \
+    _contract_dir
+  _cache_dir="$( \
+    _cache_dir_get)"
+  _contract_dir="${_cache_dir}/${contract_network}/${contract_address}"
+  _dir="${_contract_dir}/work"
   mkdir \
     -p \
-    "${_work_dir}"
+    "${_dir}"
   chmod \
     700 \
-    "${_work_dir}"
+    "${_dir}"
   _set_override \
     "work" \
     "dir" \
-    "${_work_dir}"
+    "${_dir}"
+}
+
+_cache_dir_get() {
+  local \
+    _dir
+  _dir="${HOME}/.cache/${app_name}"
+  mkdir \
+    -p \
+    "${_dir}"
+  chmod \
+    700 \
+    "${_dir}"
+  echo \
+    "${_dir}"
+}
+
+_output_dir_auto_detect() {
+  local \
+    _cache_dir \
+    _output_dir
+  if [[ "${output_type}" == "all" ]]; then
+    _cache_dir="$( \
+      _cache_dir_get)"
+    _output_dir="${_cache_dir}/${contract_network}/${contract_address}"
+  elif [[ "${output_type}" != "all" ]]; then
+    _output_dir="$( \
+      pwd)"
+  fi
+  _set_override \
+    "output" \
+    "dir" \
+    "${_output_dir}"
 }
 
 # Set defaults and, if present, overrides
@@ -1155,107 +910,89 @@ _set_overrides() {
   _work_dir_auto_detect
   _set_override \
     "output" \
-    "dir" \
-    "$(realpath \
-         $(pwd))"
-  _set_override \
-    "source" \
-    "origin" \
-    "ur"
-  _set_override \
-    "wallet" \
-    "name" \
-    "default"
+    "type" \
+    "all"
+  _output_dir_auto_detect
   _set_override \
     "user" \
     "level" \
     "n"
   _deployments_dir_auto_detect \
-    "ur" \
-    "$(_get \
-         "user" \
-         "level")"
+    "evm-contracts-source-index" \
+    "${user_level}"
   _network_auto_detect \
-    "UserRepository" \
-    "$(_get \
-         "deployments" \
-         "dir")" \
-    "$(_get \
-         "user" \
-         "level")"
+    "SourceIndex" \
+    "${deployments_dir}" \
+    "${user_level}"
   _api_key_auto_detect \
-    "$(_get \
-         "target" \
-         "network")"
-  _set_override \
-    "wallet" \
-    "path" \
-    "$(_wallet_path_get \
-         "evm-wallet" \
-         "$(_get \
-              "wallet" \
-              "name")")"
-  _secret_auto_detect \
-    "seed" \
-    "seed" \
-    "evm-wallet" \
-    "$(_get \
-         "wallet" \
-         "name")"
-  _secret_auto_detect \
-    "password" \
-    "plain" \
-    "evm-wallet" \
-    "$(_get \
-         "wallet" \
-         "name")"
-  _set_override \
-    "wallet" \
-    "address" \
-    "$(evm-wallet \
-         get \
-           "$(_get \
-                "wallet" \
-                "name")" \
-           "address")"
+    "${target_network}"
+  if [[ "${call_auth}" == "y" ]]; then
+    _set_override \
+      "wallet" \
+      "name" \
+      "default"
+    _set_override \
+      "wallet" \
+      "path" \
+      "$(_wallet_path_get \
+           "evm-wallet" \
+           "${wallet_name}")"
+    _secret_auto_detect \
+      "seed" \
+      "seed" \
+      "evm-wallet" \
+      "${wallet_name}"
+    _secret_auto_detect \
+      "password" \
+      "plain" \
+      "evm-wallet" \
+      "${wallet_name}"
+    _set_override \
+      "wallet" \
+      "address" \
+      "$(evm-wallet \
+           get \
+             "${wallet_name}" \
+             "address")"
+  elif [[ "${call_auth}" == "n" ]]; then
+    _set_override \
+      "wallet" \
+      "name" \
+      ""
+    _set_override \
+      "wallet" \
+      "path" \
+      ""
+    _set_override \
+      "wallet" \
+      "seed" \
+      ""
+    _set_override \
+      "wallet" \
+      "password" \
+      ""
+    _set_override \
+      "wallet" \
+      "address" \
+      ""
+  fi
   _contract_version_auto_detect \
-    "$(_get \
-         "deployments" \
-         "dir")" \
-    "UserRepository" \
-    "ur" \
-    "$(_get \
-         "target" \
-         "network")"
+    "${deployments_dir}" \
+    "SourceIndex" \
+    "si" \
+    "${target_network}"
   _contract_address_auto_detect \
-    "ur" \
-    "UserRepository" \
-    "ur" \
-    "$(_get \
-         "target" \
-         "network")" \
-    "$(_get \
-         "ur" \
-         "version")" \
-    "$(_get \
-         "user" \
-         "level")" \
-    "$(_get \
-         "deployments" \
-         "dir")"
-  _source_publisher_auto_detect
+    "evm-contracts-source-index" \
+    "SourceIndex" \
+    "si" \
+    "${target_network}" \
+    "${si_version}" \
+    "${user_level}" \
+    "${deployments_dir}"
   _set_override \
-    "target" \
-    "revision" \
-    "latest"
-  _set_override \
-    "retrieve" \
-    "force" \
-    "n"
-  _set_override \
-    "verify" \
-    "skip" \
-    "n"
+    "source" \
+    "publisher" \
+    ""
 }
 
 
@@ -1267,10 +1004,7 @@ _usage() {
     _deployment \
     _networks=() \
     _usage_text
-  _deployment="$( \
-    _get \
-      "deployments" \
-      "dir")/UserRepository"
+  _deployment="${deployments_dir}/SourceIndex"
   _networks=( $( \
     evm-contract-deployment-networks \
       -A \
@@ -1285,41 +1019,52 @@ _usage() {
 Build recipes retrieval tool.
 
 Usage:
-  $(_get "app" "name")
+  ${app_name}
     [options]
-    [packages]
+    (<contract_network>)
+    <contract_address>
 
 networks:
 $(_display_networks \
      "${_networks[@]}")
 
   options:
-     -S <origin>            Source origin ('ur', 'gur', 'archlinux',
-                            'aur').
-			    Default: ${source_origin}
-     -P <publisher>         Source publisher. Valid for origins
-                            are 'ur' and 'gur'. For 'gur'it defaults to
-                            'themartiancompany', for 'ur' to the
-                            kirsh trusted Ur publisher.
-			    Default: ${source_publisher}
+     -P <publisher>         Contract source publisher. 
+                            If not specified the program will
+                            look through the source publishers list,
+                            look for the deployer and attempt to retrieve
+                            its sources.
+                            If the deployer is not found after a certain
+                            number of attempts and the 'authenticated call'
+                            '-a' option is enabled, the program will
+                            check if the source has been published on the
+                            user's own namespace.
+                            If not, the program will resume looking through
+                            the publishers' list and if the deployer won't
+                            be found the program will return an error.
+                            Default: ${source_publisher}
      -W <work_dir>          Work directory.
-			    Default: ${output_dir}
+                            Default: ${output_dir}
+     -o <output_dir>        It can be 'source', 'evm_version', 'compiler',
+                            'compiler_version', 'tx_deployment' or 'all'.
+                            Default: ${output_dir}
      -o <output_dir>        Output directory.
-			    Default: ${output_dir}
-     -r <revision>          Target recipe revision to retrieve.
-			    Default: ${target_revision}
-     -A <ur_address>        Address of the UserRepository
+                            Default: ${output_dir}
+     -A <si_address>        Address of the SourceIndex
                             contract on the network.
-                            Default: ${ur_address}
-     -V <ur_version>        Version of the target UserRepository
+                            Default: ${si_address}
+     -V <si_version>        Version of the target SourceIndex
                             contract.
-                            Default: ${ur_version}
+                            Default: ${si_version}
      -u                     Whether to retrieve user repository
                             address from user directory or custom
                             deployment.
                             Default: ${user_level}
      -d <deployments_dir>   Contracts deployments directory.
                             Default: ${deployments_dir}
+     -a                     Whether to perform an authenticated
+                            call.
+                            Default: ${call_auth}
      -N <wallet_name>       Wallet name.
                             Default: ${wallet_name}
      -w <wallet_path>       Wallet path.
@@ -1328,14 +1073,11 @@ $(_display_networks \
                             Default: ${wallet_password}
      -s <wallet_seed>       Wallet seed path.
                             Default: ${wallet_seed}
-     -n <network>           EVM network name (${_networks[*]}).
+     -n <network>           EVM network name for the SourceIndex
+                            contract (${_networks[*]}).
                             Default: ${target_network}
      -k <api_key>           Etherscan-like service key.
                             Default: ${api_key}
-     -f                     If enabled attempts to retrieve the
-                            source from any of the available
-			    sources.
-                            Default: ${retrieve_force}
 
      -c                     Colors.
      -h                     This message.
@@ -1352,24 +1094,22 @@ ENDUSAGETEXT
 _show_config() {
   _msg_info "${app_name} configuration"
   _msg_info "                       Get date:   ${get_date}"
-  _msg_info "                  Source origin:   ${source_origin}"
   _msg_info "               Source publisher:   ${source_publisher}"
-  _msg_info "                Target revision:   ${target_revision}"
   _msg_info "                 Work directory:   ${work_dir}"
   _msg_info "               Output directory:   ${output_dir}"
-  _msg_info "                     Ur address:   ${ur_address}"
-  _msg_info "                     Ur version:   ${ur_version}"
+  _msg_info "           Source Index address:   ${ur_address}"
+  _msg_info "           Source Index version:   ${ur_version}"
   _msg_info "                     User level:   ${user_level}"
   _msg_info "          Deployments directory:   ${deployments_dir}"
+  _msg_info "             Authenticated call:   ${call_auth}"
   _msg_info "                    Wallet name:   ${wallet_name}"
   _msg_info "                    Wallet path:   ${wallet_path}"
   _msg_info "                Wallet password:   ${wallet_password}"
   _msg_info "                    Wallet seed:   ${wallet_seed}"
   _msg_info "                 Target network:   ${target_network}"
   _msg_info "                        API key:   ${api_key}"
-  _msg_info "                 Force retrieve:   ${retrieve_force}"
-  _msg_info "    Skip signature verification:   ${verify_skip}"
-  _msg_info "                       Packages:   ${pkgs[@]}"
+  _msg_info "               Contract network:   ${contract_network}"
+  _msg_info "               Contract address:   ${contract_address}"
 }
 
 _globals
@@ -1379,27 +1119,25 @@ _requirements
 # shellcheck disable=SC2034
 while \
   getopts \
-    'S:P:W:o:r:A:V:ud:N:w:p:s:n:k:fUcvh?' \
+    'P:W:t:o:A:V:ud:N:w:p:s:n:k:cvh?' \
     arg; do
   case \
     "${arg}" in
-    S) override_source_origin="${OPTARG}" ;;
     P) override_source_publisher="${OPTARG}" ;;
     W) override_work_dir="${OPTARG}" ;;
+    t) override_output_type="${OPTARG}" ;;
     o) override_output_dir="${OPTARG}" ;;
-    r) override_target_revision="${OPTARG}" ;;
-    A) override_ur_address="${OPTARG}" ;;
-    V) override_ur_version="${OPTARG}" ;;
+    A) override_si_address="${OPTARG}" ;;
+    V) override_si_version="${OPTARG}" ;;
     u) override_user_level="y" ;;
     d) override_deployments_dir="${OPTARG}" ;;
+    a) override_call_auth="${OPTARG}" ;;
     N) override_wallet_name="${OPTARG}" ;;
     w) override_wallet_path="${OPTARG}" ;;
     p) override_wallet_password="${OPTARG}" ;;
     s) override_wallet_seed="${OPTARG}" ;;
     n) override_target_network="${OPTARG}" ;;
     k) override_api_key="${OPTARG}" ;;
-    f) override_retrieve_force="y" ;;
-    U) override_verify_skip="y" ;;
     c) override_color="y" ;;
     v) override_quiet="n" ;;
     h|?) _set_overrides && \
@@ -1407,7 +1145,7 @@ while \
            0 ;;
     *)
     _msg_error \
-      "Invalid argument '${arg}'" \
+      "Invalid argument '${arg}'." \
       0 && \
     _set_overrides && \
     _usage \
@@ -1419,20 +1157,39 @@ shift \
   $(( \
     OPTIND - 1 \
   ))
-pkgs+=(
-  "$@"
-)
 if (( $# < 1 )); then
   _msg_error \
-    "No packages specified" \
+    "No contract address or network specified." \
     0
   _usage \
     1
 fi
+if (( $# < 2 )); then
+  if [[ "${1}" == "0x"* ]]; then
+    _msg=(
+      "No contract network specified,"
+      "assuming the target network is"
+      "the same of the target Source"
+      "Index."
+    )
+    _msg_info \
+      "${_msg[*]}"
+    contract_address="${1}"
+  else
+    _msg_error \
+      "No contract address specified." \
+      0
+    _usage \
+      1
+  fi
+else
+  contract_network="${1}"
+  contract_address="${2}"
+fi
 _set_overrides
 app_opts+=(
-  "${ur_address}"
-  "${ur_version}"
+  "${si_address}"
+  "${si_version}"
   "${deployments_dir}"
   "${wallet_name}"
   "${wallet_path}"
@@ -1440,15 +1197,14 @@ app_opts+=(
   "${wallet_seed}"
   "${target_network}"
   "${api_key}"
-  "${retrieve_force}"
-  "${verify_skip}"
-  "${source_origin}"
   "${source_publisher}"
-  "${target_revision}"
+  "${contract_network}"
+  "${contract_address}"
   "${work_dir}"
+  "${output_type}"
   "${output_dir}"
-  "${pkgs[@]}"
+  "${output_file}"
 )
 _show_config
-_aspe \
+_evm_contract_source_get \
   "${app_opts[@]}"
