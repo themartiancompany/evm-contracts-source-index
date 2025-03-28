@@ -713,6 +713,7 @@ _publisher_discover() {
   _publisher="$( \
     _publisher_get \
       "${_publisher_no}")"
+  _address_null="0x0000000000000000000000000000000000000000"
   if [[ "${_publisher}" == "" ]]; then
     _msg=(
       "Nobody has published the source"
