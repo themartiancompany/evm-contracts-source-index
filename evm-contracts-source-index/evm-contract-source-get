@@ -53,6 +53,9 @@ _requirements() {
     'evm-contract-deployment-networks' \
     'evm-contracts-tools'
   _check_cmd \
+    'evm-openpgp-key-receive' \
+    'evm-openpgp-keyserver'
+  _check_cmd \
     'evm-wallet'
   _check_cmd \
     'evmfs'
@@ -779,12 +782,6 @@ _publisher_get() {
       "${_publisher_no}")"
 }
 
-_deployer_extract() {
-  local \
-  
-    
-}
-
 _publisher_auto_detect() {
   local \
     _publishers_amount \
@@ -799,8 +796,12 @@ _publisher_auto_detect() {
   _deployer=""
   _publisher_no="0"
   _msg=(
-    _retrieving
+    "Automatically detecting"
+    "target publisher for the"
+    "contract source."
   )
+  _msg_info \
+    "${_msg[*]}"
   _publisher_get \
     "${_publisher_no}"
   _address_null="0x0000000000000000000000000000000000000000"
@@ -861,21 +862,22 @@ _publisher_auto_detect() {
         "${_msg[*]}"
       _target_publishers+=(
         "${_deployer}"
-	# Since user has published the deployer
-	# he could also have published the
-	# code so it's worth checking
-	# if deployer has not.
+        # Since user has published the deployer
+        # he could also have published the
+        # code so it's worth checking
+        # if deployer has not.
         "${wallet_address}"	
       )
       return
-    if [[ "${_deployer}" == "" ]]; then
+    elif [[ "${_deployer}" == "" ]]; then
       _msg=(
         "No self-reported deployer address."
-	"Consider doing it if the correct one"
-	"is quite down the list and signing up as"
-	"an Ur publisher to speed up the look-up"
-	"for others as well."
+        "Consider doing it if the correct one"
+        "is quite down the list and signing up as"
+        "an Ur publisher to speed up the look-up"
+        "for others as well."
       )
+    fi
   fi
   _publisher_no="$( \
     evm-contract-call \
@@ -884,6 +886,12 @@ _publisher_auto_detect() {
       "publisherNo" \
       "${_contract_network}" \
       "${_contract_address}")"
+  _msg=(
+    "Found '$(("${_publisher_no}" + 1))'"
+    "publishers."
+  )
+  _msg_info \
+    "${_msg[*]}"
   for _cursor \
     in $(seq 1 \
              "${_publisher_no}"); do
@@ -901,31 +909,56 @@ _publisher_auto_detect() {
       _msg_info \
         "${_msg[*]}"
       _target_publisher="${_deployer}"
-        break
+      break
     fi
   done
   if [[ "${_deployer}" == "" ]]; then
     _msg=(
-      "Deployer not found."
+      "Deployer not found in"
+      "any of the source code"
+      "listings, consider posting it"
+      "yourself."
     )
+    _msg_error \
+      "${_msg[*]}" \
+      1
   fi
-  _publishers_amount="$( \
-    evm-contract-call \
-      "${_si_call_opts[@]}" \
-      "${_si_address}" \
-      "publisherNo" \
-      "${_contract_network}" \
-      "${_contract_address}")"
-  
-  _locked="$( \
-    evm-contract-call \
-      "${_si_call_opts[@]}" \
-      ""
+}
 
-  _tx_deployment="$( \
-    evm-contract-call \
-      "${_si_call_opts[@]}" \
-      ""
+_publisher_keys_find() {
+  local \
+    _dir="${1}" \
+    _publisher="${2}" \
+    _find_opts=()
+  _msg=(
+    "Looking for keys by publisher '${_publisher}'"
+    "in local EVM OpenPGP Key Server database"
+    "'${_dir}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _publisher_keys=()
+  _find_opts+=(
+    -type
+      "f"
+    -name
+      "${_publisher}.*.asc"
+    -print0
+  )
+  _msg=(
+    "Running find with options"
+    "'${_find_opts[@]}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  mapfile \
+    -d \
+    $'\0' \
+    _publisher_keys < \
+    <(find \
+        "${_dir}" \
+        "${_find_opts[@]}" 2>/dev/null || \
+      true)
 }
 
 _evm_contract_source_get() {
@@ -946,6 +979,8 @@ _evm_contract_source_get() {
     _output_type="${14}" \
     _output_dir="${15}" \
     _output_file="${16}" \
+    _publisher \
+    _publisher_keys=() \
     _target_publishers=() \
     _si_call_opts=() \
     _cache_dir \
@@ -956,7 +991,9 @@ _evm_contract_source_get() {
     _source_archive \
     _publisher_latest \
     _gnupg_home \
+    _evm_openpgp_keyserver_db_dir \
     _msg=()
+  _evm_openpgp_keyserver_db_dir="${HOME}/.cache/evm-openpgp-keyserver/receive"
   _cache_dir="$( \
     _cache_dir_get)"
   _contract_artifacts_auto_detect \
@@ -973,10 +1010,22 @@ _evm_contract_source_get() {
       "${_target_publisher}"
     )
   fi
-  # _publisher_dir="${_work_dir}/${_publisher}
-  # _publisher_dir_setup \
-  #    "${_publisher_dir}"
-  _source_archive="${_publisher_dir}/${_contract_address}.tar.xz.gpg"
+  for _publisher in "${_target_publishers[@]}"; do
+    _publisher_dir="${_work_dir}/${_publisher}"
+    _publisher_dir_setup \
+       "${_publisher_dir}"
+    _source_archive="${_publisher_dir}/${_contract_address}.tar.xz.gpg"
+    _publisher_keys_find \
+      "${_evm_openpgp_keyserver_db_dir}" \
+      "${_publisher}"
+    if [[ "${_publisher_keys[*]}" == "" ]]; then
+      _msg=(
+        "No OpenPGP public keys found for"
+	"publisher '${_publisher}', downloading."
+      )
+      _msg_info \
+        "${_msg[*]}"
+    fi
   _gnupg_home="${_cache_dir}/gnupg"
   if [[ ! -e "${_gnupg_home}" ]]; then
     _msg=(
@@ -1023,7 +1072,7 @@ _evm_contract_source_get() {
   _retrieved="true"
 }
 
-_pkg_dir_setup() {
+_publisher_dir_setup() {
   local \
     _dir="${1}"
   mkdir \
