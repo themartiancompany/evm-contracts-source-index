@@ -67,6 +67,7 @@ _requirements() {
 # shellcheck disable=SC2034
 _global_variables() {
   get_date=""
+  call_auth=""
   si_address=""
   si_version=""
   wallet_name=""
@@ -701,7 +702,7 @@ _tx_deployment_get() {
     "${_contract_address}"
 }
 
-_deployer_discover() {
+_deployer_get() {
   local \
     _publisher="${1}" \
     _evm_contract_deployer_get_opts=() \
@@ -709,12 +710,16 @@ _deployer_discover() {
     _tx_null \
     _msg=()
   _tx_null="0x0000000000000000000000000000000000000000000000000000000000000000"
+  _msg=(
+    "Getting deployer address"
+    "reported by publisher '${_publisher}'."
+  )
   _tx_deployment="$( \
     _tx_deployment_get \
       "${_publisher}")"
   _evm_contract_deployer_get_opts+=(
     -n
-      "${contract_network}"
+      "${_contract_network}"
   )
   if [[ "${_tx_deployment}" == "${_tx_null}" ]]; then
     _msg=(
@@ -725,25 +730,59 @@ _deployer_discover() {
     _msg_info \
       "${_msg[*]}"
   elif [[ "${_tx_deployment}" != "${_tx_null}" ]]; then
+    _msg=(
+      "Retrieving the deployer from the"
+      "reported deployment transaction."
+    )
+    _msg_info \
+      "${_msg[*]}"
     _deployer="$( \
       evm-contract-deployer-get \
         "${_evm_contract_deployer_get_opts[@]}" \
         "${_contract_address}" \
-	"${_tx_deployment}")"
+        "${_tx_deployment}" \
+        2>/dev/null)"
   fi
-  # well continue when i wake up
+  if [[ "${_deployer}" == "" ]]; then
+    _msg=(
+      "Invalid deployment transaction"
+      "reported by publisher '${_publisher}'."
+    )
+    _msg_info \
+      "${_msg[*]}"
+  elif [[ "${_deployer}" != "" ]]; then
+    _msg=(
+      "Found deployer '${_deployer}'."
+    )
+    _msg_info \
+      "${_msg[*]}"
+  fi
 }
 
 _publisher_get() {
   local \
-    _publisher_no="${1}"
-  evm-contract-call \
-    "${_si_call_opts[@]}" \
-    "${_si_address}" \
-    "sourcePublisher" \
-    "${_contract_network}" \
-    "${_contract_address}" \
-    "${_publisher_no}"
+    _publisher_no="${1}" \
+    _msg=()
+  _msg=(
+    "Retrieving '${_publisher_no}'th"
+    "source publisher address."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _publisher="$( \
+    evm-contract-call \
+      "${_si_call_opts[@]}" \
+      "${_si_address}" \
+      "sourcePublisher" \
+      "${_contract_network}" \
+      "${_contract_address}" \
+      "${_publisher_no}")"
+}
+
+_deployer_extract() {
+  local \
+  
+    
 }
 
 _publisher_auto_detect() {
@@ -752,31 +791,124 @@ _publisher_auto_detect() {
     _locked \
     _tx_deployment \
     _publisher \
+    _cursor \
     _publisher_no \
     _address_null \
+    _deployer \
     _msg=()
+  _deployer=""
   _publisher_no="0"
-  _publisher="$( \
-    _publisher_get \
-      "${_publisher_no}")"
+  _msg=(
+    _retrieving
+  )
+  _publisher_get \
+    "${_publisher_no}"
   _address_null="0x0000000000000000000000000000000000000000"
   if [[ "${_publisher}" == "${_address_null}" ]]; then
     _msg=(
       "Nobody has published the source"
-      "for this contract."
+      "for this contract. Please consider"
+      "doing it yourself."
     )
     _msg_error \
       "${_msg[*]}" \
       1
   fi
-  _publisher="$( \
+  _deployer_get \
+    "${_publisher}"
+  if [[ "${_deployer}" != "" ]]; then
+    _msg=(
+      "Selecting deployer '${_deployer}' reported by"
+      "publisher '${_publisher}' as target"
+      "contract source publisher."
+    )
+    _msg_info \
+      "${_msg[*]}"
+    _target_publishers+=(
+      "${_deployer}"
+      # TODO: Enable getting the source from
+      # whomever has published the
+      # contract kirsh when the
+      # bytecode verification tool
+      # is ready.
+      # "${_publisher}"
+    )
+    return
+  elif [[ "${_deployer}" == "" ]]; then
+    _msg=(
+      "Kirsh publisher for this contract's"
+      "source code hasn't correctly reported the"
+      "contract deployer, getting full"
+      "list of source publishers."
+    )
+    _msg_info \
+      "${_msg[*]}"
+  fi
+  if [[ "${wallet_address}" != "" ]]; then
+    _msg=(
+      "Trying recovering deployer from"
+      "own namespace before attempting"
+      "with more the public list."
+    )
+    _deployer_get \
+      "${wallet_address}"
+    if [[ "${_deployer}" != "" ]]; then
+      _msg=(
+        "Selecting self-reported deployer '${_deployer}'"
+        "as target contract source publisher."
+      )
+      _msg_info \
+        "${_msg[*]}"
+      _target_publishers+=(
+        "${_deployer}"
+	# Since user has published the deployer
+	# he could also have published the
+	# code so it's worth checking
+	# if deployer has not.
+        "${wallet_address}"	
+      )
+      return
+    if [[ "${_deployer}" == "" ]]; then
+      _msg=(
+        "No self-reported deployer address."
+	"Consider doing it if the correct one"
+	"is quite down the list and signing up as"
+	"an Ur publisher to speed up the look-up"
+	"for others as well."
+      )
+  fi
+  _publisher_no="$( \
     evm-contract-call \
       "${_si_call_opts[@]}" \
       "${_si_address}" \
       "publisherNo" \
       "${_contract_network}" \
       "${_contract_address}")"
-
+  for _cursor \
+    in $(seq 1 \
+             "${_publisher_no}"); do
+    _publisher="$( \
+      _publisher_get \
+        "${_cursor}")"
+    _deployer_get \
+      "${_publisher}"
+    if [[ "${_deployer}" != "" ]]; then
+      _msg=(
+        "Selecting deployer '${_deployer}' reported by"
+        "publisher '${_publisher}' as target"
+        "contract source publisher."
+      )
+      _msg_info \
+        "${_msg[*]}"
+      _target_publisher="${_deployer}"
+        break
+    fi
+  done
+  if [[ "${_deployer}" == "" ]]; then
+    _msg=(
+      "Deployer not found."
+    )
+  fi
   _publishers_amount="$( \
     evm-contract-call \
       "${_si_call_opts[@]}" \
@@ -807,13 +939,14 @@ _evm_contract_source_get() {
     _wallet_seed="${7}" \
     _target_network="${8}" \
     _api_key_path="${9}" \
-    _publisher="${10}" \
+    _target_publisher="${10}" \
     _contract_network="${11}" \
     _contract_address="${12}" \
     _work_dir="${13}" \
     _output_type="${14}" \
     _output_dir="${15}" \
     _output_file="${16}" \
+    _target_publishers=() \
     _si_call_opts=() \
     _cache_dir \
     _si_abi \
@@ -833,8 +966,12 @@ _evm_contract_source_get() {
     "_si" \
     "${_si_version}"
   _contract_call_opts_setup 
-  if [[ "${_publisher}" == "" ]]; then
+  if [[ "${_target_publisher}" == "" ]]; then
     _publisher_auto_detect
+  elif [[ "${_target_publisher}" != "" ]]; then
+    _target_publishers+=(
+      "${_target_publisher}"
+    )
   fi
   # _publisher_dir="${_work_dir}/${_publisher}
   # _publisher_dir_setup \
