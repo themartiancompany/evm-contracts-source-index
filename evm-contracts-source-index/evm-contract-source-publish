@@ -2,6 +2,7 @@
 
 # SPDX-License-Identifier: AGPL-3.0
 
+#    EVM Contracts Source Index publishing tool
 #    ----------------------------------------------------------------------
 #    Copyright © 2024, 2025  Pellegrino Prevete
 #
@@ -27,12 +28,17 @@ _bin="$( \
       command \
         -v \
 	  "env")")"
-_lib="${_bin}/../lib"
-_share="${_bin}/../share"
-source \
-  "${_lib}/libcrash-bash/crash-bash"
-source \
-  "${_lib}/libevm/libevm"
+_lib="$( \
+  realpath \
+    "${_bin}/../lib")"
+_crash_bash="${_lib}/libcrash-bash/crash-bash"
+_libevm="${_lib}/libevm/libevm"
+_sourced \
+  "${_crash_bash}" 2>/dev/null || \
+  source \
+    "${_crash_bash}"
+_sourced \
+  "${_libevm}"
 
 # Check all required programs
 # are available
@@ -75,8 +81,9 @@ _requirements() {
       "No Zlib library detected." \
       1
   fi
-  _check_cmd \
-    'ur'
+  # TODO:
+  # _check_cmd \
+  #   'ur'
 }
 
 # shellcheck disable=SC2034
@@ -84,15 +91,8 @@ _global_variables() {
   publishing_date=()
   si_address=""
   si_version=""
-  deployments_dir=""
-  user_level=""
-  wallet_name=""
-  wallet_path=""
-  wallet_password=""
-  wallet_seed=""
-  wallet_address=""
-  target_network=""
-  api_key=""
+  _libevm_global_variables
+  _libevm_app_global_variables
   cache_dir=""
   target_publisher=""
   gnupg_home=""
@@ -200,8 +200,7 @@ _contract_upload() {
     _evmfs_uri_opts=() \
     _msg=()
   _msg=(
-    "Uploading contract's source"
-    "signed archive"
+    "Uploading contract's source signed archive"
     "'${_source_dir}/${_contract_name}.tar.xz.gpg'"
     "for contract '${_contract_name}' to the EVMFS."
   )
@@ -712,10 +711,6 @@ _set_overrides() {
     "date" \
     "$(_get_date_human)"
   _set_override \
-    "wallet" \
-    "name" \
-    "default"
-  _set_override \
     "user" \
     "level" \
     "n"
@@ -728,29 +723,10 @@ _set_overrides() {
     "${user_level}"
   _api_key_auto_detect \
     "${target_network}"
-  _set_override \
-    "wallet" \
-    "path" \
-    "$(_wallet_path_get \
-         "evm-wallet" \
-         "${wallet_name}")"
-  _secret_auto_detect \
-    "seed" \
-    "seed" \
+  _wallet_overrides_set \
     "evm-wallet" \
-    "${wallet_name}"
-  _secret_auto_detect \
-    "password" \
-    "plain" \
-    "evm-wallet" \
-    "${wallet_name}"
-  _set_override \
-    "wallet" \
-    "address" \
-    "$(evm-wallet \
-         get \
-	   "${wallet_name}" \
-           "address")"
+    "default" \
+    "y"
   _set_override \
     "target" \
     "publisher" \
