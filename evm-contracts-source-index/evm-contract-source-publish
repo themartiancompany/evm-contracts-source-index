@@ -102,6 +102,7 @@ _global_variables() {
   source_publish=""
   contract_address=""
   contract_source=""
+  tx_deployment=""
   evm_version=""
   target_compiler=""
   compiler_version=""
@@ -434,9 +435,10 @@ _evm_contract_source_publish() {
     _contract_network="${16}" \
     _contract_address="${17}" \
     _contract_source="${18}" \
-    _evm_version="${19}" \
-    _target_compiler="${20}" \
-    _compiler_version="${21}" \
+    _tx_deployment="${19}" \
+    _evm_version="${20}" \
+    _target_compiler="${21}" \
+    _compiler_version="${22}" \
     _msg=() \
     _contract_dir \
     _contract_name \
@@ -459,6 +461,10 @@ _evm_contract_source_publish() {
     "SourceIndex" \
     "_si" \
     "${_si_version}"
+  _publish_call_opts_setup \
+    "${_si_abi}" \
+    "${_si_bytecode}" \
+    "${_si_compiler_output}"
   if [[ "${_source_publish}" == "n" ]]; then
     _msg=(
       "Skipping contract's source publishing."
@@ -497,17 +503,14 @@ _evm_contract_source_publish() {
         "${_source_uri}"
     fi
     _source_locked_check
-    _publish_call_opts_setup \
-      "${_si_abi}" \
-      "${_si_bytecode}" \
-      "${_si_compiler_output}"
     _msg=(
       "Publisher"
       "'${_target_publisher}' posting"
       "source code '${_contract_source}'"
       "for '${_contract_name}' contract"
-      "on network '${_contract_network}'"
-      "and address '${_contract_address}',"
+      "deployed on network '${_contract_network}'"
+      "at transaction '${_tx_deployment}'"
+      "with address '${_contract_address}',"
       "pointing to EVMFS URI '${_source_uri}',"
       "set to be built for EVM version"
       "'${_evm_version}', compiler"
@@ -525,6 +528,7 @@ _evm_contract_source_publish() {
       "${_contract_network}" \
       "${_contract_address}" \
       "${_source_uri}" \
+      "${_tx_deployment}" \
       "${_evm_version}" \
       "${_target_compiler}" \
       "${_compiler_version}"
@@ -536,6 +540,26 @@ _evm_contract_source_publish() {
     _msg_info \
       "${_msg[*]}"
   fi
+  _msg=(
+    "Locking source for contract"
+    "at address '${_contract_address}'"
+    "on network '${_contract_network}'"
+    "for publisher '${_target_publisher}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  evm-contract-call \
+    "${_publish_call_opts[@]}" \
+    "${_si_address}" \
+    "lockSource" \
+    "${_target_publisher}" \
+    "${_contract_network}" \
+    "${_contract_address}"
+  _msg=(
+    "Contract's source correctly locked."
+  )
+  _msg_info \
+    "${_msg[*]}"
 }
 
 _work_dir_setup() {
@@ -794,6 +818,7 @@ Usage:
     <contract_network>
     <contract_address>
     <contract_source>
+    <tx_deployment>
     <evm_version>
     <compiler>
     <compiler_version>
@@ -835,7 +860,7 @@ $(_display_networks \
                                and skip upload.
                                Default: ${source_uri}
      -S <y/n>                  If set to 'y', it will skip
-                               recipe publishing.
+                               source publishing.
                                Default: ${source_publish}
      -H <gnupg_home>           GNUPG home directory.
                                Default: ${gnupg_home}
@@ -880,6 +905,7 @@ _show_config() {
   _msg_info "           Contract network:   ${contract_network}"
   _msg_info "           Contract address:   ${contract_address}"
   _msg_info "            Target contract:   ${contract_source}"
+  _msg_info "     Deployment transaction:   ${tx_deployment}"
   _msg_info "         Target EVM version:   ${evm_version}"
   _msg_info "            Target compiler:   ${target_compiler}"
   _msg_info "    Target compiler version:   ${compiler_version}"
@@ -966,7 +992,7 @@ if (( $# < 3 )); then
 fi
 if (( $# < 4 )); then
   _msg_error \
-    "No EVM version specified." \
+    "No deployment transaction hash given." \
     0
   _set_overrides
   _usage \
@@ -974,13 +1000,22 @@ if (( $# < 4 )); then
 fi
 if (( $# < 5 )); then
   _msg_error \
+    "No EVM version specified." \
+    0
+  _set_overrides
+  _usage \
+    1
+fi
+
+if (( $# < 6 )); then
+  _msg_error \
     "No compiler specified." \
     0
   _set_overrides
   _usage \
     1
 fi
-if (( $# < 6 )); then
+if (( $# < 7 )); then
   _msg_error \
     "No compiler version specified." \
     0
@@ -991,9 +1026,10 @@ fi
 contract_network="${1}"
 contract_address="${2}"
 contract_source="${3}"
-evm_version="${4}"
-target_compiler="${5}"
-compiler_version="${6}"
+tx_deployment="${4}"
+evm_version="${5}"
+target_compiler="${6}"
+compiler_version="${7}"
 _config_user_init \
   "${app_name}"
 _set_overrides
@@ -1017,6 +1053,7 @@ app_opts=(
   "${contract_network}"
   "${contract_address}"
   "${contract_source}"
+  "${tx_deployment}"
   "${evm_version}"
   "${target_compiler}"
   "${compiler_version}"

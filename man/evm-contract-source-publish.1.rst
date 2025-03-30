@@ -103,8 +103,8 @@ Options
                         contract's source archive evmfs URI
                         and skip upload.
 
--S y/n                  If set to 'y', it will skip
-                        recipe publishing.
+-S y\/n                 If set to 'y', it will skip
+                        source publishing.
 
 -H gnupg_home           GNUPG home directory.
 
