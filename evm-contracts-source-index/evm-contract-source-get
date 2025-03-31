@@ -70,18 +70,8 @@ _requirements() {
 # shellcheck disable=SC2034
 _global_variables() {
   get_date=""
-  call_auth=""
   si_address=""
   si_version=""
-  wallet_name=""
-  wallet_path=""
-  wallet_password=""
-  wallet_seed=""
-  wallet_address=""
-  target_network=""
-  api_key=""
-  deployments_dir=""
-  user_level=""
   source_publisher=""
   contract_network=""
   contract_address=""
@@ -1201,67 +1191,15 @@ _set_overrides() {
     "${user_level}"
   _api_key_auto_detect \
     "${target_network}"
-  if [[ "${call_auth}" == "y" ]]; then
-    _set_override \
-      "wallet" \
-      "name" \
-      "default"
-    _set_override \
-      "wallet" \
-      "path" \
-      "$(_wallet_path_get \
-           "evm-wallet" \
-           "${wallet_name}")"
-    _secret_auto_detect \
-      "seed" \
-      "seed" \
-      "evm-wallet" \
-      "${wallet_name}"
-    _secret_auto_detect \
-      "password" \
-      "plain" \
-      "evm-wallet" \
-      "${wallet_name}"
-    _set_override \
-      "wallet" \
-      "address" \
-      "$(evm-wallet \
-           get \
-             "${wallet_name}" \
-             "address")"
-  elif [[ "${call_auth}" == "n" ]]; then
-    _set_override \
-      "wallet" \
-      "name" \
-      ""
-    _set_override \
-      "wallet" \
-      "path" \
-      ""
-    _set_override \
-      "wallet" \
-      "seed" \
-      ""
-    _set_override \
-      "wallet" \
-      "password" \
-      ""
-    _set_override \
-      "wallet" \
-      "address" \
-      ""
-  fi
-  _contract_version_auto_detect \
-    "${deployments_dir}" \
-    "SourceIndex" \
-    "si" \
-    "${target_network}"
-  _contract_address_auto_detect \
+  _wallet_overrides_set \
+    "evm-wallet" \
+    "default" \
+    "n"
+  _contract_setup_auto_detect \
     "evm-contracts-source-index" \
     "SourceIndex" \
     "si" \
     "${target_network}" \
-    "${si_version}" \
     "${user_level}" \
     "${deployments_dir}"
   _set_override \
@@ -1269,7 +1207,6 @@ _set_overrides() {
     "publisher" \
     ""
 }
-
 
 # Show help usage, with an exit status.
 # $1: exit status number.
@@ -1291,6 +1228,7 @@ _usage() {
       -d '' \
       _usage_text << \
         ENDUSAGETEXT || true
+
 Build recipes retrieval tool.
 
 Usage:
@@ -1389,6 +1327,8 @@ _show_config() {
 
 _globals
 _global_variables
+_libevm_global_variables
+_libevm_app_global_variables
 _requirements
 # shellcheck disable=SC2004
 # shellcheck disable=SC2034
