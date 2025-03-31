@@ -827,30 +827,6 @@ $(_display_networks \
      "${_networks[@]}")
 
   options:
-     -A <si_address>           Address of the 'Source Index'
-                               contract on the network.
-                               Default: ${si_address}
-     -V <si_version>           Version of the target 'Source Index'
-                               contract.
-                               Default: ${si_version}
-     -u                        Whether to retrieve publishers' contract
-                               address from user directory or custom
-                               deployment.
-                               Default: ${user_level}
-     -d <deployments_dir>      Contracts deployments directory.
-                               Default: ${deployments_dir}
-     -N <wallet_name>          Wallet name.
-                               Default: ${wallet_name}
-     -w <wallet_path>          Wallet path.
-                               Default: ${wallet_path}
-     -p <wallet_password>      Wallet password.
-                               Default: ${wallet_password}
-     -s <wallet_seed>          Wallet seed path.
-                               Default: ${wallet_seed}
-     -n <network>              EVM network name (${_networks[*]}).
-                               Default: ${target_network}
-     -k <api_key>              Etherscan-like service key.
-                               Default: ${api_key}
      -P <target_publisher>     Target source publisher,
                                i.e. user's wallet address.
                                Default: ${target_publisher}
@@ -861,12 +837,43 @@ $(_display_networks \
      -S <y/n>                  If set to 'y', it will skip
                                source publishing.
                                Default: ${source_publish}
-     -H <gnupg_home>           GNUPG home directory.
-                               Default: ${gnupg_home}
      -K <fingerprint>          OpenPGP signature key.
                                Default: ${pgp_fingerprint}
      -E <email_like_id>        OpenPGP signature email.
                                Default: ${pgp_email}
+
+  contract options:
+     -A <si_address>           Address of the 'Source Index'
+                               contract on the network.
+                               Default: ${si_address}
+     -V <si_version>           Version of the target 'Source Index'
+                               contract.
+                               Default: ${si_version}
+  libevm options:
+     -u                        Whether to retrieve publishers' contract
+                               address from user directory or custom
+                               deployment.
+                               Default: ${user_level}
+     -d <deployments_dir>      Contracts deployments directory.
+                               Default: ${deployments_dir}
+     -n <network>              EVM network name (${_networks[*]}).
+                               Default: ${target_network}
+
+  credentials options:
+     -N <wallet_name>          Wallet name.
+                               Default: ${wallet_name}
+     -w <wallet_path>          Wallet path.
+                               Default: ${wallet_path}
+     -p <wallet_password>      Wallet password.
+                               Default: ${wallet_password}
+     -s <wallet_seed>          Wallet seed path.
+                               Default: ${wallet_seed}
+     -k <api_key>              Etherscan-like service key.
+                               Default: ${api_key}
+
+  application options:
+     -H <gnupg_home>           GNUPG home directory.
+                               Default: ${gnupg_home}
 
      -c                        Colors.
      -h                        This message.
