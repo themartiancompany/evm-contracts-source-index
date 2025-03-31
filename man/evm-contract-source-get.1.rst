@@ -100,10 +100,13 @@ Copyright Pellegrino Prevete. AGPL-3.0.
 See also
 ========
 
+* evm-contract-source-publish
 * evm-openpgp-key-receive
 * evm-deployer
 * evmfs
 * evm-wallet
 * evm-chains-info
+* libevm
+* crash-bash
 
 .. include:: variables.rst

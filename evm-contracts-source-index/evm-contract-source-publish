@@ -563,8 +563,7 @@ _evm_contract_source_publish() {
 
 _work_dir_setup() {
   local \
-    _msg=() \
-    _tmp_dir
+    _msg=()
   _work_dir="$( \
     mktemp \
       -u \
