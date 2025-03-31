@@ -1025,6 +1025,8 @@ _evm_contract_source_get() {
       )
       _msg_info \
         "${_msg[*]}"
+      evm-openpgp-key-receive \
+        ""
     fi
   _gnupg_home="${_cache_dir}/gnupg"
   if [[ ! -e "${_gnupg_home}" ]]; then
