@@ -61,25 +61,44 @@ consulted using *evm-chains-info*.
 Options
 ========
 
--A si_address           Address of the 'Source Index'
-                        contract on the network.
--V si_version           Version of the target 'Source Index'
-                        contract.
--u                      Whether to retrieve publishers' contract
-                        address from user directory or custom
-                        deployment.
--d deployments_dir      Contracts deployments directory.
--N wallet_name          Wallet name.
--w wallet_path          Wallet path.
--p wallet_password      Wallet password.
--s wallet_seed          Wallet seed path.
--n network              EVM network name (${_networks[*]}).
--k api_key              Etherscan-like service key.
 -P target_publisher     Target source publisher.
                         It defaults to the contract 
                         deployer's self-published entry.
 -t output_type          It can be 'source', 'evm_version',
                         'compiler' or 'compiler_version'.
+
+Contract options
+=================
+
+-A si_address           Address of the 'Source Index'
+                        contract on the network.
+-V si_version           Version of the target 'Source Index'
+                        contract.
+
+
+LibEVM options
+================
+
+-u                      Whether to retrieve publishers' contract
+                        address from user directory or custom
+                        deployment.
+-d deployments_dir      Contracts deployments directory.
+-n network              EVM network name.
+
+
+Credentials options
+====================
+
+-N wallet_name          Wallet name.
+-w wallet_path          Wallet path.
+-p wallet_password      Wallet password.
+-s wallet_seed          Wallet seed path.
+-k api_key              Etherscan-like service key.
+
+
+Application options
+====================
+
 -H gnupg_home           GNUPG home directory.
 
 -h                      Display help.

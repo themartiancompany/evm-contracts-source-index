@@ -2,6 +2,7 @@
 
 # SPDX-License-Identifier: AGPL-3.0
 
+#    EVM Contracts Source Index publishing tool
 #    ----------------------------------------------------------------------
 #    Copyright © 2024, 2025  Pellegrino Prevete
 #
@@ -80,8 +81,9 @@ _requirements() {
       "No Zlib library detected." \
       1
   fi
-  _check_cmd \
-    'ur'
+  # TODO:
+  # _check_cmd \
+  #   'ur'
 }
 
 # shellcheck disable=SC2034
@@ -199,8 +201,7 @@ _contract_upload() {
     _evmfs_uri_opts=() \
     _msg=()
   _msg=(
-    "Uploading contract's source"
-    "signed archive"
+    "Uploading contract's source signed archive"
     "'${_source_dir}/${_contract_name}.tar.xz.gpg'"
     "for contract '${_contract_name}' to the EVMFS."
   )

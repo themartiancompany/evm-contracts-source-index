@@ -74,38 +74,53 @@ Options
 
 -P target_publisher     Target source publisher,
                         i.e. user's wallet address.
--S y\/n                 If set to 'y', it will skip
+
+-S y_or_n               If set to 'y', it will skip
                         source publishing.
+
 -U source_uri           To manually specify the signed
                         contract's source archive evmfs URI
                         and skip upload.
+
 -K fingerprint          OpenPGP signature key.
+
 -E email_like_id        OpenPGP signature email.
 
-Contracts options
+Contract options
 ==================
+
 -A si_address           Address of the 'Source Index'
                         contract on the network.
+
 -V si_version           Version of the target 'Source Index'
                         contract.
 
+
 LibEVM options
-================
+===============
 
 -u                      Whether to retrieve publishers' contract
                         address from user directory or custom
                         deployment.
+
 -d deployments_dir      Contracts deployments directory.
+
 -n network              EVM network name.
+
 
 Credentials options
 ====================
 
 -N wallet_name          Wallet name.
+
 -w wallet_path          Wallet path.
+
 -p wallet_password      Wallet password.
+
 -s wallet_seed          Wallet seed path.
+
 -k api_key              Etherscan-like service key.
+
 
 Application options
 ====================
