@@ -106,92 +106,30 @@ _contract_call_opts_setup() {
   )
 }
 
-_recipe_archive_uri_get() {
+_evm_version_retrieve() {
   local \
-    _ur_address="${1}" \
+    _si_address="${1}" \
     _publisher="${2}" \
-    _pkg="${3}" \
-    _revision="${4}" \
-    _recipe_archive \
-    _price \
-    _purchased \
-    _msg=() \
-    _wallet_address
-  _wallet_address="$( \
-    evm-wallet \
-      get \
-        "${_wallet_name}" \
-        "address")"
-  _purchased="$( \
-    evm-contract-call \
-      "${_validate_call_opts[@]}" \
-      "${_ur_address}" \
-      "purchased" \
-      "${_pkg}" \
-      "${_publisher}" \
-      "${_revision}" \
-      "${_wallet_address}")"
-  if [[ "${_purchased}" == "false" ]]; then
-    _msg=(
-      "Wallet '${_wallet_name}'"
-      "identified by address '${_wallet_address}'"
-      "has not purchased revision '${_revision}'"
-      "of package '${_pkg}' by publisher '${_publisher}'".
-    )
-    _msg_error \
-      "${_msg[*]}" \
-      0
-    _msg=(
-      "Getting price for revision '${_revision}'"
-      "of package '${_pkg}' by publisher"
-      "'${_publisher}'."
-    )
-    _msg_info \
-      "${_msg[*]}"
-    _price="$( \
-      evm-contract-call \
-        "${_validate_call_opts[@]}" \
-        "${_ur_address}" \
-        "price" \
-        "${_pkg}" \
-        "${_publisher}" \
-        "${_revision}")"
-    _msg=(
-      "Revision '${_revision}' of package"
-      "'${_pkg}' by publisher"
-      "'${_publisher}' can be purchased for"
-      "\$${_price} by running"
-      "'ur-purchase ${_pkg}'."
-    )
-    _msg_error \
-      "${_msg[*]}" \
-      1
-  elif [[ "${_purchased}" == "" ]]; then
-    _msg=(
-      "Error retrieving the purchasing"
-      "status of the package by the user"
-    )
-    _msg_error \
-      "${_msg[*]}" \
-      1
-  fi
+    _contract_network="${3}" \
+    _contract_address="${4}" \
+    _msg=()
   _msg=(
-    "Retrieving recipe URI"
+    "Retrieving target EVM version."
   )
   _msg_info \
     "${_msg[*]}"
-  _recipe_archive_uri="$( \
+  _evm_version="$( \
     evm-contract-call \
-      "${_retrieve_call_opts[@]}" \
-      "${_ur_address}" \
-      "readRecipe" \
-      "${_pkg}" \
+      "${_si_call_opts[@]}" \
+      "${_si_address}" \
+      "readEvmVersion" \
       "${_publisher}" \
-      "${_revision}")"
-  if [[ "${_recipe_archive_uri}" == "" ]]; then
+      "${_contract_network}" \
+      "${_contract_address}")"
+  if [[ "${_evm_version}" == "" ]]; then
     _msg=(
-      "Target revision '${_revision}' of package"
-      "'${_pkg}' by publisher"
+      "Target EVM version for contract '${_contract_address}'"
+      "on network '${_contract_network}' by publisher"
       "'${_publisher}' does not exist or there has"
       "been an error retrieving it."
     )
@@ -201,49 +139,32 @@ _recipe_archive_uri_get() {
   fi
 }
 
-_revision_latest_get() {
+_contract_compiler_retrieve() {
   local \
-    _ur_address="${1}" \
+    _si_address="${1}" \
     _publisher="${2}" \
-    _pkg="${3}" \
-    _msg=() \
-    _revno
+    _contract_network="${3}" \
+    _contract_address="${4}" \
+    _msg=()
   _msg=(
-    "Getting latest revision for"
-    "package '${_pkg}' and publisher"
-    "'${_publisher}'."
+    "Retrieving target compiler."
   )
   _msg_info \
     "${_msg[*]}"
-  _revno="$( \
+  _contract_compiler="$( \
     evm-contract-call \
-      "${_validate_call_opts[@]}" \
-      "${_ur_address}" \
-      "revNo" \
-      "${_pkg}" \
-      "${_publisher}")"
-  if [[ "${_revno}" == "0" ]]; then
+      "${_si_call_opts[@]}" \
+      "${_si_address}" \
+      "readCompiler" \
+      "${_publisher}" \
+      "${_contract_network}" \
+      "${_contract_address}")"
+  if [[ "${_contract_compiler}" == "" ]]; then
     _msg=(
-      "Publisher '${_publisher}'"
-      "has published no '${_pkg}'"
-      "package."
-    )
-    _msg_error \
-      "${_msg[*]}" \
-      1
-  elif (( 0 < "${_revno}" )); then
-    _revision_latest="$(( \
-      _revno - 1))"
-    _msg=(
-      "Latest revision for '${_pkg}'"
-      "is '${_revision_latest}'."
-    )
-    _msg_info \
-      "${_msg[*]}"
-  else
-    _msg=(
-      "Error while retrieving"
-      "revision for package '${_pkg}'"
+      "Target compiler for contract '${_contract_address}'"
+      "on network '${_contract_network}' by publisher"
+      "'${_publisher}' does not exist or there has"
+      "been an error retrieving it."
     )
     _msg_error \
       "${_msg[*]}" \
@@ -251,14 +172,113 @@ _revision_latest_get() {
   fi
 }
 
-_recipe_archive_get() {
+_compiler_version_retrieve() {
+  local \
+    _si_address="${1}" \
+    _publisher="${2}" \
+    _contract_network="${3}" \
+    _contract_address="${4}" \
+    _msg=()
+  _msg=(
+    "Retrieving target compiler version."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _contract_compiler="$( \
+    evm-contract-call \
+      "${_si_call_opts[@]}" \
+      "${_si_address}" \
+      "readCompilerVersion" \
+      "${_publisher}" \
+      "${_contract_network}" \
+      "${_contract_address}")"
+  if [[ "${_contract_compiler}" == "" ]]; then
+    _msg=(
+      "Target compiler version for contract '${_contract_address}'"
+      "on network '${_contract_network}' by publisher"
+      "'${_publisher}' does not exist or there has"
+      "been an error retrieving it."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+}
+
+_tx_deployment_retrieve() {
+  local \
+    _si_address="${1}" \
+    _publisher="${2}" \
+    _contract_network="${3}" \
+    _contract_address="${4}" \
+    _msg=()
+  _msg=(
+    "Retrieving deployment transaction hash."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _tx_deployment="$( \
+    evm-contract-call \
+      "${_si_call_opts[@]}" \
+      "${_si_address}" \
+      "readDeploymentTransaction" \
+      "${_publisher}" \
+      "${_contract_network}" \
+      "${_contract_address}")"
+  if [[ "${_tx_deployment}" == "" ]]; then
+    _msg=(
+      "Target deployment transaction for contract '${_contract_address}'"
+      "on network '${_contract_network}' by publisher"
+      "'${_publisher}' does not exist or there has"
+      "been an error retrieving it."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+}
+
+_source_archive_uri_get() {
+  local \
+    _si_address="${1}" \
+    _publisher="${2}" \
+    _contract_network="${3}" \
+    _contract_address="${4}" \
+    _msg=()
+  _msg=(
+    "Retrieving source URI."
+  )
+  _msg_info \
+    "${_msg[*]}"
+  _source_archive_uri="$( \
+    evm-contract-call \
+      "${_si_call_opts[@]}" \
+      "${_si_address}" \
+      "readSource" \
+      "${_publisher}" \
+      "${_contract_network}" \
+      "${_contract_address}")"
+  if [[ "${_source_archive_uri}" == "" ]]; then
+    _msg=(
+      "Target source for contract '${_contract_address}'"
+      "on network '${_contract_network}' by publisher"
+      "'${_publisher}' does not exist or there has"
+      "been an error retrieving it."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+}
+
+_source_archive_get() {
   local \
     _uri="${1}" \
     _dest="${2}" \
     _evmfs_opts=() \
     _msg=()
   _msg=(
-    "Saving recipe in '${_dest}'."
+    "Saving source in '${_dest}'."
   )
   _msg_info \
     "${_msg[*]}"
@@ -951,6 +971,17 @@ _publisher_keys_find() {
       true)
 }
 
+_source_retrieve() {
+  _source_archive_uri_get \
+    "${_si_address}" \
+    "${_publisher}" \
+    "${_contract_network}" \
+    "${_contract_address}"
+  _source_archive_get \
+    "${_source_archive_uri}" \
+    "${_source_archive}"
+}
+
 _evm_contract_source_get() {
   local \
     _si_address="${1}" \
@@ -992,6 +1023,7 @@ _evm_contract_source_get() {
     "SourceIndex" \
     "_si" \
     "${_si_version}"
+  _retrieved="false"
   _contract_call_opts_setup 
   if [[ "${_target_publisher}" == "" ]]; then
     _publisher_auto_detect
@@ -1016,52 +1048,35 @@ _evm_contract_source_get() {
       _msg_info \
         "${_msg[*]}"
       evm-openpgp-key-receive \
-        ""
+        "${_publisher}"
+      _publisher_keys_find \
+        "${_evm_openpgp_keyserver_db_dir}" \
+        "${_publisher}"
     fi
-  _gnupg_home="${_cache_dir}/gnupg"
-  if [[ ! -e "${_gnupg_home}" ]]; then
-    _msg=(
-      "Source Index publishers keyring does not exist."
-    )
-    _msg_info \
-      "${_msg[*]}"
-  fi
-  _revision_latest_get \
-    "${_ur_address}" \
-    "${_publisher}" \
-    "${_pkg}"
-  if [[ "${_revision}" == "latest" || \
-        "${_revision}" == "" ]]; then
-    _revision="${_revision_latest}"
-  fi
-  _revision_validate \
-    "${_revision}" \
-    "${_revision_latest}"
-  _recipe_archive_uri_get \
-    "${_ur_address}" \
-    "${_publisher}" \
-    "${_pkg}" \
-    "${_revision}"
-  _recipe_archive_get \
-    "${_recipe_archive_uri}" \
-    "${_recipe_archive}"
-  if [[ "${_verify_skip}" == "n" ]]; then
-    _recipe_archive_validate \
+    if [[ "${_output_type}" == "" ]] || \
+       [[ "${_output_type}" == "source" ]]; then
+      _source_retrieve
+    elif [[ "${_output_type}" != "" ]]; then
+      "_${_type}_retrieve"
+    fi
+  # _gnupg_home="${_cache_dir}/gnupg"
+  # if [[ ! -e "${_gnupg_home}" ]]; then
+  #   _msg=(
+  #     "Source Index publishers keyring does not exist."
+  #   )
+  #   _msg_info \
+  #     "${_msg[*]}"
+  # fi
+    _source_archive_validate \
       "${_recipe_archive}" \
       "${_publisher}"
-  elif [[ "${_verify_skip}" == "y" ]]; then
-    _msg=(
-      "Skipping signature verification."
-    )
-    _msg_info \
-      "${_msg[*]}"
-  fi
-  _recipe_archive_extract \
-    "${_pkg}" \
-    "${_recipe_archive}" \
-    "${_pkg_dir}" \
-    "${_verify_skip}"
-  _retrieved="true"
+    _recipe_archive_extract \
+      "${_pkg}" \
+      "${_recipe_archive}" \
+      "${_pkg_dir}" \
+      "${_verify_skip}"
+    _retrieved="true"
+  done
 }
 
 _publisher_dir_setup() {
