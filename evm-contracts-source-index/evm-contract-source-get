@@ -753,6 +753,13 @@ _publisher_keys_find() {
 }
 
 _source_retrieve() {
+  local \
+    _si_address="${1}" \
+    _publisher="${2}" \
+    _contract_network="${3}" \
+    _contract_address="${4}" \
+    _source_archive="${5}" \
+    _source_archive_uri
   _source_archive_uri_get \
     "${_si_address}" \
     "${_publisher}" \
@@ -782,6 +789,7 @@ _evm_contract_source_get() {
     _output_type="${15}" \
     _output_dir="${16}" \
     _output_file="${17}" \
+    _retrieve_opts=() \
     _publisher \
     _publisher_keys=() \
     _target_publishers=() \
@@ -790,7 +798,6 @@ _evm_contract_source_get() {
     _si_abi \
     _si_bytecode \
     _si_compiler_output \
-    _source_archive_uri \
     _source_archive \
     _publisher_latest \
     _gnupg_home \
@@ -842,11 +849,22 @@ _evm_contract_source_get() {
         "${_evm_openpgp_keyserver_db_dir}" \
         "${_publisher}"
     fi
+    _retrieve_opts=(
+      "${_si_address}"
+      "${_publisher}"
+      "${_contract_network}"
+      "${_contract_address}"
+    )
     if [[ "${_output_type}" == "all" ]]; then
-      _source_retrieve
-      _evm_version_retrieve
-      _compiler_retrieve
-      _compiler_version_retrieve
+      _source_retrieve \
+        "${_retrieve_opts[@]}" \
+	"${_source_archive}"
+      _evm_version_retrieve \
+        "${_retrieve_opts[@]}"
+      _compiler_retrieve \
+        "${_retrieve_opts[@]}"
+      _compiler_version_retrieve \
+        "${_retrieve_opts[@]}"
     elif [[ "${_output_type}" != "all" ]]; then
       "_${_type}_retrieve"
     fi
