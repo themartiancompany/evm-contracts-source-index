@@ -193,7 +193,7 @@ _compiler_version_retrieve() {
       "${_publisher}" \
       "${_contract_network}" \
       "${_contract_address}")"
-  if [[ "${_contract_version}" == "" ]]; then
+  if [[ "${_compiler_version}" == "" ]]; then
     _msg=(
       "Target compiler version for contract '${_contract_address}'"
       "on network '${_contract_network}' by publisher"
