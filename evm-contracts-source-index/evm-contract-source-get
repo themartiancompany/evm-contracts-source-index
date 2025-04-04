@@ -75,6 +75,7 @@ _global_variables() {
   source_publisher=""
   contract_network=""
   contract_address=""
+  keys_update=""
   output_dir=""
   output_type=""
   output_file=""
@@ -139,7 +140,7 @@ _evm_version_retrieve() {
   fi
 }
 
-_contract_compiler_retrieve() {
+_compiler_retrieve() {
   local \
     _si_address="${1}" \
     _publisher="${2}" \
@@ -314,205 +315,11 @@ _source_archive_get() {
   fi
 }
 
-_signature_keyring_verify() {
-  local \
-    _gpg_out="${1}" \
-    _nopubkey_string \
-    _goodsig_string \
-    _fingerprint_string \
-    _errsig_string \
-    _fingerprint
-   _nopubkey_string="$( \
-    echo \
-      "${_gpg_out}" | \
-      grep \
-        "^\[GNUPG:\] NO_PUBKEY " || \
-      true)"
-  _goodsig_string="$( \
-    echo \
-      "${_gpg_out}" | \
-      grep \
-        "^\[GNUPG:\] GOODSIG " || \
-      true)"
-  if [[ "${_nopubkey_string}" == "" ]] && \
-     [[ "${_goodsig_string}" != "" ]]; then
-    _fingerprint_string="$( \
-      echo \
-        "${_gpg_out}" | \
-        grep \
-          "^\[GNUPG:\] KEY_CONSIDERED " || \
-        true)"
-    _fingerprint="$( \
-      echo \
-        "${_fingerprint_string}" | \
-        awk \
-          '{print $3}')"
-    _msg=(
-      "The key used to sign the archive"
-      "is correct and has fingerprint"
-      "'${_fingerprint}'."
-    )
-  elif [[ "${_nopubkey_string}" != "" ]] && \
-       [[ "${_goodsig_string}" == "" ]]; then
-    _errsig_string="$( \
-      echo \
-        "${_gpg_out}" | \
-        grep \
-          "^\[GNUPG:\] ERRSIG " || \
-        true)"
-    _fingerprint="$( \
-      echo \
-        "${_errsig_string}" | \
-        awk \
-          '{print $9}')"
-    _msg=(
-      "Archive signed with unknown"
-      "fingerprint '${_fingerprint}'."
-      "If you are sure the fingerprint"
-      "is indeed correct run"
-      "'ur-publishers update'"
-      "to update the Ur publishers"
-      "signatures' database."
-    )
-    _msg_error \
-      "${_msg[*]}" \
-      1
-  fi
-}
-
-_newkey_author_extract(){
-  local \
-    _gpg_out="${1}" \
-    _pattern
-  _pattern="^\[GNUPG:\] NEWSIG "
-  _author_string="$( \
-    echo \
-      "${_gpg_out}" | \
-      grep \
-        "${_pattern}" || \
-      true)"
-  _author="$( \
-    echo \
-      "${_author_string}" | \
-      awk \
-        '{print $3}')"
-}
-
-_validkey_author_extract(){
-  local \
-    _gpg_out="${1}" \
-    _pattern \
-    _fingerprint \
-    _gpg_opts=() \
-    _gpg_key_info_opts=()
-  _gpg_opts+=(
-    --homedir
-      "${_gnupg_home}"
-    --export
-    --armor
-  )
-  _gpg_key_info_opts+=(
-    -o
-      "email"
-  )
-  _pattern="^\[GNUPG:\] VALIDSIG "
-  _author_string="$( \
-    echo \
-      "${_gpg_out}" | \
-      grep \
-        "${_pattern}" || \
-      true)"
-  _fingerprint="$( \
-    echo \
-      "${_author_string}" | \
-      awk \
-        '{print $3}')"
-  gpg \
-    "${_gpg_opts[@]}" \
-    "${_fingerprint}" > \
-    "${_pkg_dir}/${_fingerprint}.asc"
-  _author="$( \
-    gpg-key-info \
-      "${_gpg_key_info_opts[@]}" \
-      "${_pkg_dir}/${_fingerprint}.asc")"
-  rm \
-    -rf \
-    "${_pkg_dir}/${_fingerprint}.asc"
-}
-
-_signature_author_verify() {
-  local \
-    _publisher="${1}" \
-    _gpg_out="${2}" \
-    _author_string \
-    _author \
-    _msg=() \
-    _unsigned \
-    _patterns=() \
-    _pattern
-  _publisher="$( \
-    _lower \
-      "${_publisher}")"
-  _newkey_author_extract \
-    "${_gpg_out}"
-  if [[ "${_author}" == "" ]]; then
-    _validkey_author_extract \
-      "${_gpg_out}"
-  fi
-  _author="$( \
-    _lower \
-      "${_author}")"
-  if [[ "${_author_string}" == "" ]]; then
-    _unsigned="$( \
-      echo \
-        "${_gpg_out}" | \
-        grep \
-          "^\[GNUPG:\] NODATA 3" || \
-        true)"
-    if [[ "${_unsigned}" != "" ]]; then
-      _msg=(
-        "The archive is not signed."
-      )
-    else
-      _msg=(
-        "Unknown GNUPG error."
-        "GNUPG output:"
-      )
-    fi
-    _msg_error \
-      "${_msg[*]}" \
-      0
-    echo \
-      "${_gpg_out}"
-  fi
-  if [[ "${_author}" == "" ]]; then
-    _msg=(
-      "Archive '${_archive}' is"
-      "missing an author."
-    )
-    _msg_error \
-      "${_msg[*]}" \
-      1
-  fi
-  if [[ "${_author}" != *"@${_publisher}" ]]; then
-    _msg=(
-      "Archive '${_archive}' is signed"
-      "by '${_author#*@}' while it should"
-      "be signed by '${_publisher}'."
-    )
-    _msg_error \
-      "${_msg[*]}" \
-      1
-  fi
-}
-
-_recipe_archive_validate() {
+_source_archive_validate() {
   local \
     _archive="${1}" \
     _publisher="${2}" \
-    _gpg_out \
-    _gpg_opts=() \
-    _author \
+    _evm_gpg_signature_verify_opts=() \
     _msg=()
   _msg=(
     "Validating archive"
@@ -521,14 +328,6 @@ _recipe_archive_validate() {
   )
   _msg_info \
     "${_msg[*]}"
-  _gpg_opts+=(
-    --homedir
-      "${_gnupg_home}"
-    --with-colons
-    --status-fd
-      1
-    --verify
-  )
   if [[ ! -e "${_archive}" ]]; then
     _msg=(
       "Somehow the archive '${_archive}'"
@@ -542,33 +341,15 @@ _recipe_archive_validate() {
       "'${_archive}.'"
     )
   fi
-  if [[ "${quiet}" == "y" ]]; then
-    _gpg_out="$( \
-      gpg \
-        "${_gpg_opts[@]}" \
-        "${_archive}" 2>/dev/null || \
-      true)"
-  elif [[ "${quiet}" == "n" ]]; then
-    _gpg_out="$( \
-      gpg \
-        "${_gpg_opts[@]}" \
-        "${_archive}" || \
-      true)"
-  fi
-  if [[ "${_gpg_out}" == "" ]]; then
-    _msg=(
-      "Error verifying archive signature."
-      "Try running 'ur-publishers update'."
+  if [[ "${quiet}" == "n" ]]; then
+    _evm_gpg_signature_verify_opts+=(
+      -v
     )
-    _msg_error \
-      "${_msg[*]}" \
-      1
   fi
-  _signature_author_verify \
-    "${_publisher}" \
-    "${_gpg_out}"
-  _signature_keyring_verify \
-    "${_gpg_out}"
+  evm-gpg-signature-verify \
+    "${_evm_gpg_signature_verify_opts[@]}" \
+    "${_source_archive}" \
+    "${_publisher}"
 }
 
 _archive_contents_read() {
@@ -607,26 +388,25 @@ _archive_contents_read() {
 
 _archive_contents_check() {
   local \
-    _pkg="${1}" \
+    _contract_address="${1}" \
     _archive="${2}" \
     _archive_contents=() \
     _file \
     _msg=()
   _msg=(
     "Verifying '${_archive}'"
-    "integrity for package '${_pkg}'."
+    "integrity for contract '${_contract_address}'."
   )
   _msg_info \
     "${_msg[*]}"
   _archive_contents_read \
     "${_archive}"
   for _file in "${_archive_contents[@]}"; do
-    if [[ "${_file}" != "${_pkg}/"* && \
-          "${_file}" != *"/" ]]; then
+    if [[ "${_file}" != "${_contract_address}.sol" ]]; then
       _msg=(
         "Found '${_file}' in archive '${_archive}',"
-        "but all files must reside in the '${_pkg}/'"
-        "directory."
+        "but the only file in the archive must be"
+	"'${_contract_address}.sol'."
       )
       _msg_error \
         "${_msg[*]}" \
@@ -635,12 +415,13 @@ _archive_contents_check() {
   done
 }
 
-_recipe_archive_extract() {
+_source_archive_extract() {
   local \
-    _pkg="${1}" \
-    _recipe_archive="${2}" \
-    _pkg_dir="${3}" \
-    _verify_skip="${4}" \
+    _contract_address="${1}" \
+    _source_archive="${2}" \
+    _publisher_dir="${3}" \
+    _publisher="${4}" \
+    _evm_gpg_decrypt_opts=() \
     _msg=() \
     _tar_archive \
     _integrity_error \
@@ -648,21 +429,22 @@ _recipe_archive_extract() {
     _gpg_opts=() \
     _archive_contents=() \
     _file
-  _tar_archive="${_recipe_archive%.gpg}"
-  if [[ "${_verify_skip}" == "n" ]]; then
-    _gpg_opts+=(
-      --homedir
-        "${_gnupg_home}"
-      --output
-        "${_tar_archive}"
-      --decrypt
+  if [[ "${quiet}" == "n" ]]; then
+    _evm_gpg_decrypt_opts+=(
+      -v
     )
-    gpg \
-      "${_gpg_opts[@]}" \
-      "${_recipe_archive}"
   fi
+  _tar_archive="${_source_archive%.gpg}"
+  _evm_gpg_decrypt_opts+=(
+    -o
+      "${_tar_archive}"
+  )
+  evm-gpg-decrypt \
+    "${_evm_gpg_decrypt_opts[@]}" \
+    "${_source_archive}" \
+    "${_publisher}"
   _archive_contents_check \
-    "${_pkg}" \
+    "${_contract_address}" \
     "${_tar_archive}"
   if [[ "${quiet}" == "n" ]]; then
     _tar_opts+=(
@@ -671,7 +453,7 @@ _recipe_archive_extract() {
   fi
   _tar_opts+=(
     --directory
-      "${_pkg_dir}"
+      "${_publisher_dir}"
     -x
     -f
   )
@@ -997,9 +779,10 @@ _evm_contract_source_get() {
     _contract_network="${11}" \
     _contract_address="${12}" \
     _work_dir="${13}" \
-    _output_type="${14}" \
-    _output_dir="${15}" \
-    _output_file="${16}" \
+    _keys_update="${14}" \
+    _output_type="${15}" \
+    _output_dir="${16}" \
+    _output_file="${17}" \
     _publisher \
     _publisher_keys=() \
     _target_publishers=() \
@@ -1013,7 +796,13 @@ _evm_contract_source_get() {
     _publisher_latest \
     _gnupg_home \
     _evm_openpgp_keyserver_db_dir \
+    _evm_openpgp_key_receive_opts=() \
     _msg=()
+  if [[ "${quiet}" == "n" ]]; then
+    _evm_openpgp_key_receive_opts+=(
+      -v
+    )
+  fi
   _evm_openpgp_keyserver_db_dir="${HOME}/.cache/evm-openpgp-keyserver/receive"
   _cache_dir="$( \
     _cache_dir_get)"
@@ -1023,7 +812,6 @@ _evm_contract_source_get() {
     "SourceIndex" \
     "_si" \
     "${_si_version}"
-  _retrieved="false"
   _contract_call_opts_setup 
   if [[ "${_target_publisher}" == "" ]]; then
     _publisher_auto_detect
@@ -1040,42 +828,48 @@ _evm_contract_source_get() {
     _publisher_keys_find \
       "${_evm_openpgp_keyserver_db_dir}" \
       "${_publisher}"
-    if [[ "${_publisher_keys[*]}" == "" ]]; then
+    if [[ "${_publisher_keys[*]}" == "" || \
+          "${_keys_update}" == "y" ]]; then
       _msg=(
         "No OpenPGP public keys found for"
-	"publisher '${_publisher}', downloading."
+        "publisher '${_publisher}', downloading."
       )
       _msg_info \
         "${_msg[*]}"
       evm-openpgp-key-receive \
+        "${_evm_openpgp_key_receive_opts[@]}" \
         "${_publisher}"
       _publisher_keys_find \
         "${_evm_openpgp_keyserver_db_dir}" \
         "${_publisher}"
     fi
-    if [[ "${_output_type}" == "" ]] || \
-       [[ "${_output_type}" == "source" ]]; then
+    if [[ "${_output_type}" == "" ]]; then
       _source_retrieve
+      _evm_version_retrieve
+      _compiler_retrieve
+      _compiler_version_retrieve
     elif [[ "${_output_type}" != "" ]]; then
       "_${_type}_retrieve"
     fi
-  # _gnupg_home="${_cache_dir}/gnupg"
-  # if [[ ! -e "${_gnupg_home}" ]]; then
-  #   _msg=(
-  #     "Source Index publishers keyring does not exist."
-  #   )
-  #   _msg_info \
-  #     "${_msg[*]}"
-  # fi
-    _source_archive_validate \
-      "${_recipe_archive}" \
-      "${_publisher}"
-    _recipe_archive_extract \
-      "${_pkg}" \
-      "${_recipe_archive}" \
-      "${_pkg_dir}" \
-      "${_verify_skip}"
-    _retrieved="true"
+    if [[ "${_output_type}" == "" || \
+          "${_output_type}" == "source" ]]; then
+      if [[ -e "${_source_archive}" ]]; then
+        _source_archive_validate \
+          "${_source_archive}" \
+          "${_publisher}"
+        _source_archive_extract \
+          "${_contract_address}" \
+          "${_source_archive}" \
+          "${_publisher_dir}" \
+          "${_publisher}"
+        _retrieved="true"
+      fi
+    fi
+    if [[ "${_retrieved}" == "true" ]]; then
+      # TODO:
+      #   bytecode verification.
+      break
+    fi
   done
 }
 
@@ -1449,6 +1243,7 @@ app_opts+=(
   "${contract_network}"
   "${contract_address}"
   "${work_dir}"
+  "${update_keys}"
   "${output_type}"
   "${output_dir}"
   "${output_file}"

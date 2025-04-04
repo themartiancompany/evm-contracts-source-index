@@ -172,7 +172,7 @@ _contract_compress() {
   _msg=(
     "Compressing source recipe"
     "repository for contract"
-    "'${_contract_name}'."
+    "'${_contract_name}.sol'."
   )
   _msg_info \
     "${_msg[*]}"
@@ -339,6 +339,8 @@ _evmfs_uri_check() {
 
 _contract_prepare() {
   local \
+    _contract_source="${1}" \
+    _contract_address="${2}"
     _msg=() \
     _contract_filename
   if [[ ! -e "${_contract_source}" ]]; then
@@ -352,14 +354,14 @@ _contract_prepare() {
       1
   fi
   _work_dir_setup
-  cp \
-    -r \
-    "${_contract_source}" \
-    "${_work_dir}"
   _contract_filename="$( \
     basename \
       "${_contract_source}")"
   _contract_name="${_contract_filename%*.sol}"
+  cp \
+    -r \
+    "${_contract_source}" \
+    "${_work_dir}/${_contract_address}.sol"
 }
 
 _source_locked_check() {
@@ -441,7 +443,6 @@ _evm_contract_source_publish() {
     _compiler_version="${22}" \
     _msg=() \
     _contract_dir \
-    _contract_name \
     _work_dir \
     _si_abi \
     _si_bytecode \
@@ -473,18 +474,20 @@ _evm_contract_source_publish() {
       "${_msg[*]}"
   elif [[ "${_source_publish}" == "y" ]]; then
     if [[ "${_source_uri}" == "" ]]; then
-      _contract_prepare
+      _contract_prepare \
+        "${_contract_source}" \
+        "${_contract_address}"
       _contract_compress \
         "${_work_dir}" \
-        "${_contract_name}"
+        "${_contract_address}"
       _contract_sign \
         "${_work_dir}" \
-        "${_contract_name}" \
+        "${_contract_address}" \
         "${_gnupg_home}" \
         "${_key_fingerprint}"
       _contract_upload \
         "${_work_dir}" \
-        "${_contract_name}" \
+        "${_contract_address}" \
         "${_wallet_name}" \
         "${_wallet_path}" \
         "${_wallet_password}" \
