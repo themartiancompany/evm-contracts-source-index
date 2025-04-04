@@ -519,14 +519,14 @@ _deployer_get() {
   if [[ "${_tx_deployment}" == "${_tx_null}" ]]; then
     _msg=(
       "No deployment transaction attached to"
-      "publisher '${_pubisher}' reported"
+      "publisher '${_publisher}' reported"
       "contracts' sources."
     )
     _msg_info \
       "${_msg[*]}"
   elif [[ "${_tx_deployment}" != "${_tx_null}" ]]; then
     _msg=(
-      "Retrieving the deployer from the"
+      "Retrieving the deployer from publisher '${_publisher}'"
       "reported deployment transaction."
     )
     _msg_info \
@@ -535,8 +535,7 @@ _deployer_get() {
       evm-contract-deployer-get \
         "${_evm_contract_deployer_get_opts[@]}" \
         "${_contract_address}" \
-        "${_tx_deployment}" \
-        2>/dev/null)"
+        "${_tx_deployment}")"
   fi
   if [[ "${_deployer}" == "" ]]; then
     _msg=(
