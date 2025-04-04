@@ -810,13 +810,8 @@ _evm_contract_source_get() {
   _contract_address="$( \
     _lower \
       "${_contract_address}")"
-  _tx_deployment="$( \
-    _lower \
-      "${_tx_deployment}")"
   _address_sanity_check \
     "${_contract_address}"
-  _tx_hash_sanity_check \
-    "${_tx_deployment}"
   if [[ "${quiet}" == "n" ]]; then
     _evm_openpgp_key_receive_opts+=(
       -v
