@@ -843,15 +843,15 @@ _evm_contract_source_get() {
         "${_evm_openpgp_keyserver_db_dir}" \
         "${_publisher}"
     fi
-    if [[ "${_output_type}" == "" ]]; then
+    if [[ "${_output_type}" == "all" ]]; then
       _source_retrieve
       _evm_version_retrieve
       _compiler_retrieve
       _compiler_version_retrieve
-    elif [[ "${_output_type}" != "" ]]; then
+    elif [[ "${_output_type}" != "all" ]]; then
       "_${_type}_retrieve"
     fi
-    if [[ "${_output_type}" == "" || \
+    if [[ "${_output_type}" == "all" || \
           "${_output_type}" == "source" ]]; then
       if [[ -e "${_source_archive}" ]]; then
         _source_archive_validate \
@@ -981,6 +981,10 @@ _set_overrides() {
     "get" \
     "date" \
     "$(_get_date_human)"
+  _set_override \
+    "keys" \
+    "update" \
+    "n"
   _work_dir_auto_detect
   _set_override \
     "output" \
@@ -1065,28 +1069,23 @@ $(_display_networks \
                             the publishers' list and if the deployer won't
                             be found the program will return an error.
                             Default: ${source_publisher}
-     -W <work_dir>          Work directory.
-                            Default: ${output_dir}
-     -o <output_dir>        It can be 'source', 'evm_version', 'compiler',
+     -U                     Whether to update the keys associated to the address.
+                            Default: ${keys_update}
+     -t <output_type>       It can be 'source', 'evm_version', 'compiler',
                             'compiler_version', 'tx_deployment' or 'all'.
-                            Default: ${output_dir}
+                            Default: ${output_type}
      -o <output_dir>        Output directory.
                             Default: ${output_dir}
+
+  contract options:
      -A <si_address>        Address of the SourceIndex
                             contract on the network.
                             Default: ${si_address}
      -V <si_version>        Version of the target SourceIndex
                             contract.
                             Default: ${si_version}
-     -u                     Whether to retrieve user repository
-                            address from user directory or custom
-                            deployment.
-                            Default: ${user_level}
-     -d <deployments_dir>   Contracts deployments directory.
-                            Default: ${deployments_dir}
-     -a                     Whether to perform an authenticated
-                            call.
-                            Default: ${call_auth}
+
+  credentials options:
      -N <wallet_name>       Wallet name.
                             Default: ${wallet_name}
      -w <wallet_path>       Wallet path.
@@ -1095,11 +1094,26 @@ $(_display_networks \
                             Default: ${wallet_password}
      -s <wallet_seed>       Wallet seed path.
                             Default: ${wallet_seed}
+     -k <api_key>           Etherscan-like service key.
+                            Default: ${api_key}
+
+  libEVM options:
+     -a                     Whether to perform an authenticated
+                            call.
+                            Default: ${call_auth}
+     -u                     Whether to retrieve user repository
+                            address from user directory or custom
+                            deployment.
+                            Default: ${user_level}
+     -d <deployments_dir>   Contracts deployments directory.
+                            Default: ${deployments_dir}
      -n <network>           EVM network name for the SourceIndex
                             contract (${_networks[*]}).
                             Default: ${target_network}
-     -k <api_key>           Etherscan-like service key.
-                            Default: ${api_key}
+
+  application options:
+     -W <work_dir>          Work directory.
+                            Default: ${output_dir}
 
      -c                     Colors.
      -h                     This message.
@@ -1147,7 +1161,7 @@ _requirements
 getopts_opts="$( \
   printf \
     "%s" \
-    "P:t:o:" \
+    "P:U:t:o:" \
     "A:V:" \
     "$(_libevm_app_getopts_params_get)" \
     "a:n:" \
@@ -1167,6 +1181,8 @@ while \
       override_output_type="${OPTARG}" ;;
     o) \
       override_output_dir="${OPTARG}" ;;
+    U) \
+      override_keys_update="${OPTARG}" ;;
     A) \
       override_si_address="${OPTARG}" ;;
     V) \
@@ -1243,7 +1259,7 @@ app_opts+=(
   "${contract_network}"
   "${contract_address}"
   "${work_dir}"
-  "${update_keys}"
+  "${keys_update}"
   "${output_type}"
   "${output_dir}"
   "${output_file}"
