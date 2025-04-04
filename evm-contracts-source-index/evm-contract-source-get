@@ -1323,21 +1323,25 @@ _show_config() {
   _msg_info "${app_name} configuration"
   _msg_info "                       Get date:   ${get_date}"
   _msg_info "               Source publisher:   ${source_publisher}"
-  _msg_info "                 Work directory:   ${work_dir}"
+  _msg_info "               Contract network:   ${contract_network}"
+  _msg_info "               Contract address:   ${contract_address}"
   _msg_info "               Output directory:   ${output_dir}"
+  _msg_info "             Contract options:"
   _msg_info "           Source Index address:   ${ur_address}"
   _msg_info "           Source Index version:   ${ur_version}"
-  _msg_info "                     User level:   ${user_level}"
-  _msg_info "          Deployments directory:   ${deployments_dir}"
-  _msg_info "             Authenticated call:   ${call_auth}"
+  _msg_info "          Credentials options:"
   _msg_info "                    Wallet name:   ${wallet_name}"
   _msg_info "                    Wallet path:   ${wallet_path}"
   _msg_info "                Wallet password:   ${wallet_password}"
   _msg_info "                    Wallet seed:   ${wallet_seed}"
-  _msg_info "                 Target network:   ${target_network}"
   _msg_info "                        API key:   ${api_key}"
-  _msg_info "               Contract network:   ${contract_network}"
-  _msg_info "               Contract address:   ${contract_address}"
+  _msg_info "               LibEVM options:"
+  _msg_info "                 Target network:   ${target_network}"
+  _msg_info "             Authenticated call:   ${call_auth}"
+  _msg_info "                     User level:   ${user_level}"
+  _msg_info "          Deployments directory:   ${deployments_dir}"
+  _msg_info "          Application options:"
+  _msg_info "                 Work directory:   ${work_dir}"
 }
 
 _globals
@@ -1346,41 +1350,55 @@ _libevm_global_variables
 _libevm_app_global_variables
 _requirements
 # shellcheck disable=SC2004
-# shellcheck disable=SC2034
+getopts_opts="$( \
+  printf \
+    "%s" \
+    "P:t:o:" \
+    "A:V:" \
+    "$(_libevm_app_getopts_params_get)" \
+    "a:n:" \
+    "$(_wallet_getopts_params_get)" \
+    "W:cvh")"
 while \
   getopts \
-    'P:W:t:o:A:V:ud:N:w:p:s:n:k:cvh?' \
+    "${getopts_opts}" \
     arg; do
+  _wallet_getopts_case
+  _libevm_app_getopts_case
   case \
     "${arg}" in
-    P) override_source_publisher="${OPTARG}" ;;
-    W) override_work_dir="${OPTARG}" ;;
-    t) override_output_type="${OPTARG}" ;;
-    o) override_output_dir="${OPTARG}" ;;
-    A) override_si_address="${OPTARG}" ;;
-    V) override_si_version="${OPTARG}" ;;
-    u) override_user_level="y" ;;
-    d) override_deployments_dir="${OPTARG}" ;;
-    a) override_call_auth="${OPTARG}" ;;
-    N) override_wallet_name="${OPTARG}" ;;
-    w) override_wallet_path="${OPTARG}" ;;
-    p) override_wallet_password="${OPTARG}" ;;
-    s) override_wallet_seed="${OPTARG}" ;;
-    n) override_target_network="${OPTARG}" ;;
-    k) override_api_key="${OPTARG}" ;;
-    c) override_color="y" ;;
-    v) override_quiet="n" ;;
-    h|?) _set_overrides && \
-	 _usage \
-           0 ;;
+    P) \
+      override_source_publisher="${OPTARG}" ;;
+    t) \
+      override_output_type="${OPTARG}" ;;
+    o) \
+      override_output_dir="${OPTARG}" ;;
+    A) \
+      override_si_address="${OPTARG}" ;;
+    V) \
+      override_si_version="${OPTARG}" ;;
+    a) \
+      override_call_auth="${OPTARG}" ;;
+    n) \
+      override_target_network="${OPTARG}" ;;
+    W) \
+      override_work_dir="${OPTARG}" ;;
+    c) \
+      override_color="y" ;;
+    v) \
+      override_quiet="n" ;;
+    h) \
+      _set_overrides && \
+        _usage \
+          0 ;;
     *)
-    _msg_error \
-      "Invalid argument '${arg}'." \
-      0 && \
-    _set_overrides && \
-    _usage \
-      1
-    ;;
+      if [[ " ${getopts_opts} " != *"${arg}"* ]]; then
+        _msg_error \
+          "Invalid argument '${arg}'." \
+          0
+        _usage \
+          1
+      fi ;;
   esac
 done
 shift \
