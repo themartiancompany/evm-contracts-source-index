@@ -140,7 +140,7 @@ _evm_version_retrieve() {
   fi
 }
 
-_compiler_retrieve() {
+_contract_compiler_retrieve() {
   local \
     _si_address="${1}" \
     _publisher="${2}" \
@@ -193,7 +193,7 @@ _compiler_version_retrieve() {
       "${_publisher}" \
       "${_contract_network}" \
       "${_contract_address}")"
-  if [[ "${_contract_compiler}" == "" ]]; then
+  if [[ "${_contract_version}" == "" ]]; then
     _msg=(
       "Target compiler version for contract '${_contract_address}'"
       "on network '${_contract_network}' by publisher"
@@ -752,7 +752,7 @@ _publisher_keys_find() {
       true)
 }
 
-_source_retrieve() {
+_contract_source_retrieve() {
   local \
     _si_address="${1}" \
     _publisher="${2}" \
@@ -806,6 +806,7 @@ _evm_contract_source_get() {
     _gnupg_home \
     _evm_openpgp_keyserver_db_dir \
     _evm_openpgp_key_receive_opts=() \
+    _value \
     _msg=()
   _contract_address="$( \
     _lower \
@@ -864,15 +865,15 @@ _evm_contract_source_get() {
       "${_contract_address}"
     )
     if [[ "${_output_type}" == "all" ]]; then
-      _source_retrieve \
+      _contract_source_retrieve \
         "${_retrieve_opts[@]}" \
-	"${_source_archive}"
+        "${_source_archive}"
       _evm_version_retrieve \
         "${_retrieve_opts[@]}"
       echo \
         "${_evm_version}" > \
         "${_output_dir}/evm_version.txt"
-      _compiler_retrieve \
+      _contract_compiler_retrieve \
         "${_retrieve_opts[@]}"
       echo \
         "${_contract_compiler}" > \
@@ -883,7 +884,16 @@ _evm_contract_source_get() {
         "${_compiler_version}" > \
         "${_output_dir}/compiler_version.txt"
     elif [[ "${_output_type}" != "all" ]]; then
-      "_${_type}_retrieve"
+      "_${_output_type}_retrieve"
+      if [[ "${_output_type}" != "contract_source" ]]; then
+        _value=$( \
+          _get \
+            "" \
+            "${_type}")
+        echo \
+          "${_value}" > \
+          "${_output_file}"
+      fi
     fi
     if [[ "${_output_type}" == "all" || \
           "${_output_type}" == "source" ]]; then
@@ -998,6 +1008,26 @@ _output_dir_auto_detect() {
     "${_output_dir}"
 }
 
+_output_file_auto_detect() {
+  local \
+    _cache_dir \
+    _output_dir \
+    _output_file
+  if [[ "${output_type}" == "all" ]]; then
+    _cache_dir="$( \
+      _cache_dir_get)"
+    _output_dir="${_cache_dir}/${contract_network}/${contract_address}"
+    _output_file="${_output_dir}/${_contract_address}.sol"
+  elif [[ "${output_type}" != "all" ]]; then
+    _output_file="$( \
+      pwd)/${_contract_address}.sol"
+  fi
+  _set_override \
+    "output" \
+    "file" \
+    "${_output_file}"
+}
+
 # Set defaults and, if present, overrides
 # command line option parameters
 _set_overrides() {
@@ -1025,6 +1055,7 @@ _set_overrides() {
     "type" \
     "all"
   _output_dir_auto_detect
+  _output_file_auto_detect
   _set_override \
     "user" \
     "level" \
@@ -1105,10 +1136,12 @@ $(_display_networks \
                             Default: ${source_publisher}
      -U                     Whether to update the keys associated to the address.
                             Default: ${keys_update}
-     -t <output_type>       It can be 'source', 'evm_version', 'compiler',
+     -t <output_type>       It can be 'contract_source', 'evm_version', 'contract_compiler',
                             'compiler_version', 'tx_deployment' or 'all'.
                             Default: ${output_type}
-     -o <output_dir>        Output directory.
+     -O <output_dir>        Output directory (for 'all' input type).
+                            Default: ${output_dir}
+     -o <output_dir>        Output file.
                             Default: ${output_dir}
 
   contract options:
@@ -1168,6 +1201,7 @@ _show_config() {
   _msg_info "               Contract network:   ${contract_network}"
   _msg_info "               Contract address:   ${contract_address}"
   _msg_info "               Output directory:   ${output_dir}"
+  _msg_info "                    Output file:   ${output_file}"
   _msg_info "             Contract options:"
   _msg_info "           Source Index address:   ${si_address}"
   _msg_info "           Source Index version:   ${si_version}"
@@ -1195,7 +1229,7 @@ _requirements
 getopts_opts="$( \
   printf \
     "%s" \
-    "P:U:t:o:" \
+    "P:U:t:O:o:" \
     "A:V:" \
     "$(_libevm_app_getopts_params_get)" \
     "a:n:" \
@@ -1213,8 +1247,10 @@ while \
       override_source_publisher="${OPTARG}" ;;
     t) \
       override_output_type="${OPTARG}" ;;
-    o) \
+    O) \
       override_output_dir="${OPTARG}" ;;
+    o) \
+      override_output_file="${OPTARG}" ;;
     U) \
       override_keys_update="${OPTARG}" ;;
     A) \
