@@ -458,6 +458,38 @@ _evm_contract_source_publish() {
     _si_bytecode \
     _si_compiler_output \
     _publish_call_opts=()
+  if [[ "${_contract_address}" == "" ]]; then
+    _msg=(
+      "No contract address specified."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+  if [[ "${_tx_deployment}" == "" ]]; then
+    _msg=(
+      "No contract deployment transaction specified."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+  if [[ "${_evm_version}" == "" ]]; then
+    _msg=(
+      "No contract EVM version specified."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+  if [[ "${_compiler_version}" == "" ]]; then
+    _msg=(
+      "No contract compiler version specified."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
   _contract_address="$( \
     _lower \
       "${_contract_address}")"
@@ -806,6 +838,10 @@ _set_overrides() {
     "${HOME}/.config/evm-gnupg"
   _pgp_fingerprint_auto_detect
   _pgp_email_auto_detect
+  _set_override \
+    "target" \
+    "compiler" \
+    "solc"
 }
 
 # Show help usage, with an exit status.
