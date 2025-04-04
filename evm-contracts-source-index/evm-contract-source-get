@@ -1017,10 +1017,10 @@ _output_file_auto_detect() {
     _cache_dir="$( \
       _cache_dir_get)"
     _output_dir="${_cache_dir}/${contract_network}/${contract_address}"
-    _output_file="${_output_dir}/${_contract_address}.sol"
+    _output_file="${_output_dir}/${contract_address}.sol"
   elif [[ "${output_type}" != "all" ]]; then
     _output_file="$( \
-      pwd)/${_contract_address}.sol"
+      pwd)/${contract_address}.sol"
   fi
   _set_override \
     "output" \
