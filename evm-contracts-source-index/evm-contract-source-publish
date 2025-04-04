@@ -340,7 +340,7 @@ _evmfs_uri_check() {
 _contract_prepare() {
   local \
     _contract_source="${1}" \
-    _contract_address="${2}"
+    _contract_address="${2}" \
     _msg=() \
     _contract_filename
   if [[ ! -e "${_contract_source}" ]]; then
@@ -417,6 +417,16 @@ _source_locked_check() {
   fi
 }
 
+_contract_address_check() {
+  local \
+    _
+  _tx_deployment="$( \
+    _lower \
+      "${_tx_deployment}")"
+  _bytes32_check \
+    "${_tx_deployment}"
+}
+
 _evm_contract_source_publish() {
   local \
     _si_address="${1}" \
@@ -448,6 +458,16 @@ _evm_contract_source_publish() {
     _si_bytecode \
     _si_compiler_output \
     _publish_call_opts=()
+  _contract_address="$( \
+    _lower \
+      "${_contract_address}")"
+  _tx_deployment="$( \
+    _lower \
+      "${_tx_deployment}")"
+  _address_sanity_check \
+    "${_contract_address}"
+  _tx_hash_sanity_check \
+    "${_tx_deployment}"
   _contract_dir="${_cache_dir}/${_contract_network}/${_contract_address}"
   _msg=(
     "Publishing source for"
