@@ -908,7 +908,7 @@ $(_display_networks \
      -V <si_version>           Version of the target 'Source Index'
                                contract.
                                Default: ${si_version}
-  libevm options:
+  libEVM options:
      -u                        Whether to retrieve publishers' contract
                                address from user directory or custom
                                deployment.
