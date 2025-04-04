@@ -185,7 +185,7 @@ _compiler_version_retrieve() {
   )
   _msg_info \
     "${_msg[*]}"
-  _contract_compiler="$( \
+  _compiler_version="$( \
     evm-contract-call \
       "${_si_call_opts[@]}" \
       "${_si_address}" \
@@ -799,6 +799,9 @@ _evm_contract_source_get() {
     _si_bytecode \
     _si_compiler_output \
     _source_archive \
+    _evm_version \
+    _contract_compiler \
+    _compiler_version \
     _publisher_latest \
     _gnupg_home \
     _evm_openpgp_keyserver_db_dir \
@@ -861,10 +864,19 @@ _evm_contract_source_get() {
 	"${_source_archive}"
       _evm_version_retrieve \
         "${_retrieve_opts[@]}"
+      echo \
+        "${_evm_version}" > \
+        "${_output_dir}/evm_version.txt"
       _compiler_retrieve \
         "${_retrieve_opts[@]}"
+      echo \
+        "${_contract_compiler}" > \
+        "${_output_dir}/compiler.txt"
       _compiler_version_retrieve \
         "${_retrieve_opts[@]}"
+      echo \
+        "${_compiler_version}" > \
+        "${_output_dir}/compiler_version.txt"
     elif [[ "${_output_type}" != "all" ]]; then
       "_${_type}_retrieve"
     fi
