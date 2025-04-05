@@ -770,6 +770,111 @@ _contract_source_retrieve() {
     "${_source_archive}"
 }
 
+_compiler_version_check() {
+  local \
+    _data="${1}"
+  _msg=(
+    "Invalid version number."
+  )
+  echo \
+    "${_data}" | \
+    grep \
+      -e \
+        "^([0-9].)([0-9].)([0-9].)$" || \
+    _msg_error \
+      "${_msg[*]}" \
+      1
+}
+
+_contract_compiler_check() {
+  local \
+    _data="${1}" \
+    _compilers=()
+  _compilers=(
+    "serpent"
+    "solc"
+  )
+  if [[ " ${_compilers[*]} " != *" ${_data}  "* ]]; then
+    _msg=(
+      "Invalid compiler."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+}
+
+_evm_version_check() {
+  local \
+    _data="${1}" \
+    _evm_versions=()
+  _evm_versions=(
+    "homestead"
+    "tangerineWhistle"
+    "spuriousDragon"
+    "byzantium"
+    "constantinople"
+    "petersburg"
+    "istanbul"
+    "berlin"
+    "london"
+    "paris"
+    "shanghai"
+    "cancun"
+    "prague"
+    "osaka"
+  )
+  if [[ " ${_evm_versions[*]} " != *" ${_data}  "* ]]; then
+    _msg=(
+      "Invalid EVM version."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+}
+
+_contract_data_save() {
+  local \
+    _type="${1}" \
+    _data="${2}" \
+    _output_file="${3}" \
+    _msg=()
+  _output_file="${_output_dir}/${_type}.txt"
+  if (( 2 < "$#" )); then
+    _output_file="${3}"
+  fi
+  if [[ "${_data}" == "" ]]; then
+    _msg=(
+      "Empty data for type '${_type}'."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+  "_${_type}_check"
+  echo \
+    "${_data}" > \
+    "${_output_file}"
+}
+
+_output_type_check() {
+  local \
+    _msg=()
+  if [[ "${_output_type}" != "all" && \
+        "${_output_type}" != "contract_compiler" && \
+        "${_output_type}" != "contract_source" && \
+        "${_output_type}" != "compiler_version" && \
+        "${_output_type}" != "evm_version" ]]; then
+    _msg=(
+      "Invalid output type '${_output_type}'."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+}
+
 _evm_contract_source_get() {
   local \
     _si_address="${1}" \
@@ -808,9 +913,7 @@ _evm_contract_source_get() {
     _evm_openpgp_key_receive_opts=() \
     _value \
     _msg=()
-  _contract_address="$( \
-    _lower \
-      "${_contract_address}")"
+  _output_type_check
   _address_sanity_check \
     "${_contract_address}"
   if [[ "${quiet}" == "n" ]]; then
@@ -870,19 +973,19 @@ _evm_contract_source_get() {
         "${_source_archive}"
       _evm_version_retrieve \
         "${_retrieve_opts[@]}"
-      echo \
-        "${_evm_version}" > \
-        "${_output_dir}/evm_version.txt"
+      _contract_data_save \
+        "evm_version" \
+        "${_evm_version}"
       _contract_compiler_retrieve \
         "${_retrieve_opts[@]}"
-      echo \
-        "${_contract_compiler}" > \
-        "${_output_dir}/compiler.txt"
+      _contract_data_save \
+        "contract_compiler" \
+        "${_evm_version}"
       _compiler_version_retrieve \
         "${_retrieve_opts[@]}"
-      echo \
-        "${_compiler_version}" > \
-        "${_output_dir}/compiler_version.txt"
+      _contract_data_save \
+        "compiler_version" \
+        "${_compiler_version}"
     elif [[ "${_output_type}" != "all" ]]; then
       "_${_output_type}_retrieve"
       if [[ "${_output_type}" != "contract_source" ]]; then
@@ -890,9 +993,10 @@ _evm_contract_source_get() {
           _get \
             "" \
             "${_type}")
-        echo \
-          "${_value}" > \
-          "${_output_file}"
+        _contract_data_save
+          "${_output_type}" \
+          "${_value}" \
+	  "${_output_file}"
       fi
     fi
     if [[ "${_output_type}" == "all" || \
@@ -906,6 +1010,9 @@ _evm_contract_source_get() {
           "${_source_archive}" \
           "${_publisher_dir}" \
           "${_publisher}"
+	mv \
+          "${_publisher_dir}/${_contract_address}.sol" \
+	  "${_output_dir}"
         _retrieved="true"
       fi
     fi
@@ -1312,7 +1419,9 @@ if (( $# < 2 )); then
   fi
 else
   contract_network="${1}"
-  contract_address="${2}"
+  contract_address="$( \
+    _lower \
+      "${2}")"
 fi
 _set_overrides
 app_opts+=(
