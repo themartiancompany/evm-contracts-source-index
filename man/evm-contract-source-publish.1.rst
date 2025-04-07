@@ -34,14 +34,7 @@ Ethereum Virtual Machine (EVM) smart contracts source index publishing tool
 Synopsis
 ========
 
-evm-contract-source-publish
-  *[options]*
-  *contract_network*
-  *contract_address*
-  *contract_source*
-  *evm_version*
-  *compiler*
-  *compiler_version*
+evm-contract-source-publish *[options]* *contract_network* *contract_address* *contract_source* *tx_deployment* *evm_version* *compiler* *compiler_version*
 
 
 Description
