@@ -1378,7 +1378,7 @@ while \
       _set_overrides && \
         _usage \
           0 ;;
-    *)
+    *) \
       if [[ " ${getopts_opts} " != *"${arg}"* ]]; then
         _msg_error \
           "Invalid argument '${arg}'." \
