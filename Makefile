@@ -40,7 +40,7 @@ BASH_FILES=\
 
 _INSTALL_FILE=install -vDm644
 _INSTALL_EXE=install -vDm755
-_INSTALL_DIR="install -vdm755
+_INSTALL_DIR=install -vdm755
 
 _INSTALL_CONTRACTS_DEPLOYMENT_FUN:=\
   install-contracts-deployments-$(SOLIDITY_COMPILER_BACKEND)
@@ -72,8 +72,8 @@ _INSTALL_DOC_TARGETS:=\
 _INSTALL_SCRIPTS_TARGETS:=\
   install-bash-scripts
 _INSTALL_SCRIPTS_TARGETS_ALL:=\
-  install-scripts \
-  $(_INSTALL_SCRIPTS_TARGETS)
+  $(_INSTALL_SCRIPTS_TARGETS) \
+  install-scripts
 _INSTALL_TARGETS:=\
   $(_INSTALL_DOC_TARGETS) \
   $(_INSTALL_CONTRACTS_TARGETS) \
