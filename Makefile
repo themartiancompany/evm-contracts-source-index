@@ -33,8 +33,15 @@ DOC_FILES=\
   $(wildcard *.md)
 SCRIPT_FILES=$(wildcard $(_PROJECT)/*)
 
-_INSTALL_FILE=install -Dm644
-_INSTALL_EXE=install -Dm755
+BASH_FILES=\
+  evm-contract-source-get \
+  evm-contract-source-publish \
+  evm-contract-source-verify
+
+_INSTALL_FILE=install -vDm644
+_INSTALL_EXE=install -vDm755
+_INSTALL_DIR="install -vdm755
+
 _INSTALL_CONTRACTS_DEPLOYMENT_FUN:=\
   install-contracts-deployments-$(SOLIDITY_COMPILER_BACKEND)
 _BUILD_TARGETS:=\
@@ -62,15 +69,20 @@ _INSTALL_CONTRACTS_TARGETS_ALL:=\
 _INSTALL_DOC_TARGETS:=\
   install-doc \
   install-man
+_INSTALL_SCRIPTS_TARGETS:=\
+  install-bash-scripts
+_INSTALL_SCRIPTS_TARGETS_ALL:=\
+  install-scripts \
+  $(_INSTALL_SCRIPTS_TARGETS)
 _INSTALL_TARGETS:=\
   $(_INSTALL_DOC_TARGETS) \
   $(_INSTALL_CONTRACTS_TARGETS) \
-  install-scripts
+  $(_INSTALL_SCRIPTS_TARGETS)
 _INSTALL_TARGETS_ALL:=\
   install \
   $(_INSTALL_DOC_TARGETS) \
   $(_INSTALL_CONTRACTS_TARGETS_ALL) \
-  install-scripts
+  ${_INSTALL_SCRIPTS_TARGETS_ALL)
 _PHONY_TARGETS:=\
   $(_BUILD_TARGETS_ALL) \
   $(_CHECK_TARGETS_ALL) \
@@ -84,6 +96,8 @@ install: $(_INSTALL_TARGETS)
 check: $(_CHECK_TARGETS)
 
 install-contracts: $(_INSTALL_CONTRACTS_TARGETS)
+
+install-scripts: $(_INSTALL_SCRIPTS_TARGETS)
 
 clean:
 
@@ -108,6 +122,7 @@ contracts:
 	    "$(SOLIDITY_COMPILER_BACKEND)" \
 	  -w \
 	    "$(BUILD_DIR)"
+
 
 install-contracts-sources:
 
@@ -190,14 +205,16 @@ install-man:
 	rst2man \
 	  "man/evm-contract-source-get.1.rst" \
 	  "$(MAN_DIR)/man1/evm-contract-source-get.1"
+	rst2man \
+	  "man/evm-contract-source-verify.1.rst" \
+	  "$(MAN_DIR)/man1/evm-contract-source-verify.1"
 
-install-scripts:
+install-bash-scripts:
 
-	$(_INSTALL_EXE) \
-	  "$(_PROJECT)/evm-contract-source-publish" \
-	  "$(BIN_DIR)/evm-contract-source-publish"
-	$(_INSTALL_EXE) \
-	  "$(_PROJECT)/evm-contract-source-get" \
-	  "$(BIN_DIR)/evm-contract-source-get"
+	for _file in $(_BASH_FILES); do \
+	  $(_INSTALL_EXE) \
+	  "$(_PROJECT)/$${_file}" \
+	  "$(BIN_DIR)/$${_file}"; \
+	done
 
 .PHONY: $(_PHONY_TARGETS)
