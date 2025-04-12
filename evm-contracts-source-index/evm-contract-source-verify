@@ -787,6 +787,7 @@ _usage() {
       -d '' \
       _usage_text << \
         ENDUSAGETEXT || true
+
 EVM network smart contract verifier
 
 Usage:
@@ -794,15 +795,19 @@ Usage:
     [options]
     <contract_address>
 
-    <file>
-
   networks:
 $(_display_networks \
      "${_networks[@]}")
 
 
   options:
-     -b <bytecode_verify>     It can be 'standalone' or 'bulk'
+     -b <bytecode_verify>   It can be 'standalone' or 'bulk'
+                            Default: ${bytecode_verify}
+     -e <evm_version>       EVM version for the contract.
+                            Default: ${evm_version}
+     -S <solc_version>      Solc version for the contract.
+                            Default: ${solc_version}
+     -T <tx_deployment>     Deployment transaction for this contract.
                             Default: ${transaction_deployment}
 
   contract options:
@@ -822,7 +827,6 @@ $(_display_networks \
                             Default: ${deployments_dir}
      -n <network>           EVM network name (${_networks[*]}).
                             Default: ${target_network}
-
 
   credentials options:
      -N <wallet_name>       Wallet name.
@@ -881,7 +885,7 @@ _config_user_init \
 getopts_opts="$( \
   printf \
     "%s" \
-    "i:b:e:S:" \
+    "i:b:e:S:T:" \
     "A:V:" \
     "$(_libevm_app_getopts_params_get)" \
     "n:" \
@@ -893,11 +897,6 @@ while \
     arg; do
   _wallet_getopts_case
   _libevm_app_getopts_case
-
-while \
-  getopts \
-    ':m:C:cvh?' \
-    arg; do
   case \
     "${arg}" in
     i) \
@@ -908,6 +907,8 @@ while \
       override_evm_version="${OPTARG}" ;;
     S) \
       override_solc_version="${OPTARG}" ;;
+    T) \
+      override_tnansaction_deployment="${OPTARG}" ;;
     A) \
       override_si_address="${OPTARG}" ;;
     V) \
@@ -973,7 +974,7 @@ app_opts=(
   "${contract_address}"
   "${target_publisher}"
   "${contract_file}"
-  "${contract_transaction_deployment}"
+  "${transaction_deployment}"
   "${evm_version}"
   "${solc_version}"
 )
