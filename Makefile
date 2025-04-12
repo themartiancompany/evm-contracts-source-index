@@ -33,7 +33,7 @@ DOC_FILES=\
   $(wildcard *.md)
 SCRIPT_FILES=$(wildcard $(_PROJECT)/*)
 
-BASH_FILES=\
+_BASH_FILES=\
   evm-contract-source-get \
   evm-contract-source-publish \
   evm-contract-source-verify
@@ -82,7 +82,7 @@ _INSTALL_TARGETS_ALL:=\
   install \
   $(_INSTALL_DOC_TARGETS) \
   $(_INSTALL_CONTRACTS_TARGETS_ALL) \
-  ${_INSTALL_SCRIPTS_TARGETS_ALL)
+  $(_INSTALL_SCRIPTS_TARGETS_ALL)
 _PHONY_TARGETS:=\
   $(_BUILD_TARGETS_ALL) \
   $(_CHECK_TARGETS_ALL) \
@@ -199,15 +199,11 @@ install-man:
 	install \
 	  -vdm755 \
 	  "$(MAN_DIR)/man1"
-	rst2man \
-	  "man/evm-contract-source-publish.1.rst" \
-	  "$(MAN_DIR)/man1/evm-contract-source-publish.1"
-	rst2man \
-	  "man/evm-contract-source-get.1.rst" \
-	  "$(MAN_DIR)/man1/evm-contract-source-get.1"
-	rst2man \
-	  "man/evm-contract-source-verify.1.rst" \
-	  "$(MAN_DIR)/man1/evm-contract-source-verify.1"
+	for _file in $(_BASH_FILES); do \
+	  rst2man \
+	  "man/$${_file}.1.rst" \
+	  "$(MAN_DIR)/man1/$${_file}.1"; \
+	done
 
 install-bash-scripts:
 
