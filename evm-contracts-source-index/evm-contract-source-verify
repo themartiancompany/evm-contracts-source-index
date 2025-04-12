@@ -799,13 +799,17 @@ Usage:
 $(_display_networks \
      "${_networks[@]}")
 
-
   options:
+     -i <contract_file>     If not specified will try to get
+                            one from the index.
+                            Default: ${contract_file}
      -b <bytecode_verify>   It can be 'standalone' or 'bulk'
                             Default: ${bytecode_verify}
      -e <evm_version>       EVM version for the contract.
                             Default: ${evm_version}
      -S <solc_version>      Solc version for the contract.
+                            If not specified will attempt
+                            to get one from the index.
                             Default: ${solc_version}
      -T <tx_deployment>     Deployment transaction for this contract.
                             Default: ${transaction_deployment}
