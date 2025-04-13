@@ -66,10 +66,20 @@ consulted using *evm-chains-info*.
 Options
 ========
 
+-i contract_file          If not specified will try to get
+                          it from the Source Index.
+-b bytecode_verify        It can be 'runtime',
 -P target_publisher       Target source publisher.
                           It defaults to the contract 
                           deployer's self-published entry.
--t bytecode_verification  It can be 'runtime',
+-e evm_version            EVM version for the contract.
+-S solc_version           Solc version for the contract.
+                          If not specified will attempt
+                          to get one from the index.
+-T tx_deployment          Deployment transaction for this contract.
+                          If not specified will try to get
+                          it from the Source Index.
+
 
 Contract options
 =================
