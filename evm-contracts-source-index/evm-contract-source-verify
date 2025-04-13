@@ -650,6 +650,8 @@ $(_display_networks \
                             Default: ${solc_version}
      -T <tx_deployment>     Deployment transaction for this contract.
                             Default: ${transaction_deployment}
+     -P <target_publisher>  Specify publisher for this contract.
+                            Default: ${target_publisher}
 
   contract options:
      -A <si_address>        Address of the EVM contract source
@@ -700,9 +702,9 @@ ENDUSAGETEXT
 _show_config() {
   _msg_info "${app_name} configuration"
   _msg_info "        Verification date:   ${verify_date}"
-  _msg_info "         Target publisher:   ${target_publisher}"
   _msg_info "    Bytecode verification:   ${bytecode_verify}"
   _msg_info "         Contract address:   ${contract_address}"
+  _msg_info "         Target publisher:   ${target_publisher}"
   _msg_info "          Contract source:   ${contract_file}"
   _msg_info "             Solc version:   ${solc_version}"
   _msg_info "              EVM version:   ${evm_version}"
