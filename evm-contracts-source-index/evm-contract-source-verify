@@ -95,73 +95,13 @@ _cache_dir_auto_detect() {
     "${_dir}"
 }
 
-# _chunk_verify() {
-#   local \
-#     _contract="${1}" \
-#     _namespace="${2}" \
-#     _sum="${3}" \
-#     _index="${4}" \
-#     _chunk="${5}" \
-#     _remote \
-#     _verify_dir \
-#     _local_sum \
-#     _remote_sum \
-#     _msg=()
-#   _verify_dir="${_cache_dir}/${_sum}/verify"
-#   _remote="${_verify_dir}/${_index}"
-#   mkdir \
-#     -p \
-#     "${_verify_dir}"
-#   evm-contract-call \
-#     "${_verify_call_opts[@]}" \
-#     "${_fs_address}" \
-#     "chunks" \
-#     "${_namespace}" \
-#     "${_sum}" \
-#     "${_index}" > \
-#     "${_remote}"
-#   _local_sum="$( \
-#     _file_hash \
-#       "${_chunk}")"
-#   _remote_sum="$( \
-#     _file_hash \
-#       "${_remote}")"
-#   if [[ "${_local_sum}" != "${_remote_sum}" ]]; then
-#     _msg=(
-#       "somehow local chunk '${_chunk}',"
-#       "corresponding to chunk having"
-#       "index '${_index}' on the blockchain"
-#       "has not been written correctly"
-#       "on the blockchain at address '$(_publishing_address_get)'"
-#     )
-#     _msg_error \
-#       "${_msg[*]}" \
-#       1
-#   fi
-# }
-
-_sum_get() {
-  local \
-    _content="${1}" 
-  echo \
-    "${_content}" | \
-    sha256sum | \
-      awk \
-        '{print $1}'
-}
-
 _file_hash() {
   local \
-    _file="${1}" \
-    _content
-  _content="$( \
-    cat \
-      "${_file}")"
-  _sum="$( \
-    _sum_get \
-      "${_content}")"
-  echo \
-   "${_sum}" 
+    _file="${1}"
+  sha256sum \
+    "${_file}" | \
+    awk \
+      '{print $1}'
 }
 
 _work_dir_setup() {
@@ -179,79 +119,49 @@ _work_dir_setup() {
     "${_tmp_dir}"
 }
 
-# _file_encode() {
-#   local \
-#     _msg=() \
-#     _length
-#   _length=22000
-#   _chunk_prefix="$( \
-#     mktemp \
-#       -u \
-#       -p \
-#       "${_tmp_dir}" \
-#       --suffix=".base64")"
-#   _file_size_check \
-#     "${_file}"
-#   _bin2txt_opts+=(
-#     -L
-#       "${_length}"
-#   )
-#   if [[ "${quiet}" == "n" ]]; then
-#     _bin2txt_opts+=(
-#       -v
-#     )
-#   fi
-#   _msg=(
-#     "encoding file with base64 encoding"
-#     "and splitting it into 22000 characters"
-#     "chunks"
-#   )
-#   _msg_info \
-#     "${_msg[*]}"
-#   bin2txt \
-#     "${_bin2txt_opts[@]}" \
-#     "${_file}" \
-#     "${_chunk_prefix}"
-# }
-
-# _evm_contract_source_get_opts_setup() {
-#   if [[ "${_wallet_name}" != "" ]]; then
-#     _evm_contract_source_get_opts+=(
-#       -N
-#         "${_wallet_name}"
-#     )
-#   fi
-#   if [[ "${_wallet_seed}" != "" ]]; then
-#     _evm_contract_source_get_opts+=(
-#       -s
-#         "${_wallet_seed}"
-#     )
-#   fi
-#   if [[ "${_wallet_seed}" != "" ]]; then
-#     _evm_contract_source_get_opts+=(
-#       -s
-#         "${_wallet_seed}"
-#     )
-#   fi
-#   if [[ "${_wallet_password}" != "" ]]; then
-#     _evm_contract_source_get_opts+=(
-#       -p
-#         "${_wallet_password}"
-#     )
-#   fi
-#   if [[ "${_api_key_path}" != "" ]]; then
-#     _evm_contract_source_get_opts+=(
-#       -k
-#         "${_api_key_path}"
-#     )
-#   fi
-#   if [[ "${_target_network}" != "" ]]; then
-#     _evm_contract_source_get_opts+=(
-#       -n
-#         "${_target_network}"
-#     )
-#   fi
-# }
+_evm_contract_source_get_opts_setup() {
+  if [[ "${quiet}" == "n" ]]; then
+    _evm_contract_source_get_opts+=(
+      -v
+    )
+  fi
+  if [[ "${_wallet_name}" != "" ]]; then
+    _evm_contract_source_get_opts+=(
+      -N
+        "${_wallet_name}"
+    )
+  fi
+  if [[ "${_wallet_seed}" != "" ]]; then
+    _evm_contract_source_get_opts+=(
+      -s
+        "${_wallet_seed}"
+    )
+  fi
+  if [[ "${_wallet_seed}" != "" ]]; then
+    _evm_contract_source_get_opts+=(
+      -s
+        "${_wallet_seed}"
+    )
+  fi
+  if [[ "${_wallet_password}" != "" ]]; then
+    _evm_contract_source_get_opts+=(
+      -p
+        "${_wallet_password}"
+    )
+  fi
+  if [[ "${_api_key_path}" != "" ]]; then
+    _evm_contract_source_get_opts+=(
+      -k
+        "${_api_key_path}"
+    )
+  fi
+  if [[ "${_target_network}" != "" ]]; then
+    _evm_contract_source_get_opts+=(
+      -n
+        "${_target_network}"
+    )
+  fi
+}
 
 _solidity_compiler_opts_setup() {
   local \
@@ -282,6 +192,8 @@ _solidity_compiler_opts_setup() {
     _solidity_compiler_opts+=(
       -t
         "bytecode_runtime"
+      -o
+        "${_cache_dir}/${_sum}"
     )
   fi
 }
@@ -309,19 +221,15 @@ _evm_contract_source_verify() {
     _command_args=() \
     _evm_contract_source_get_opts=() \
     _solidity_compiler_opts=() \
-    _cmd \
-    _args=() \
-    _namespace \
     _si_abi \
     _si_bytecode \
-    _si_compiler_output
+    _si_compiler_output \
+    _sum
   shift \
     18
   _command_args+=(
     "$@"
   )
-  # if [[ "${quiet}" == "n" ]]; then
-  # fi
   _msg=(
     "Verifying source for"
     "contract '${_contract_address}'"
@@ -332,28 +240,50 @@ _evm_contract_source_verify() {
     "${_msg[*]}"
   if [[ "${_bytecode_verify}" == "runtime" ]]; then
     if [[ "${_contract_file}" == "" ]]; then
+      # _contract_artifacts_auto_detect \
+      #   "${_deployments_dir}" \
+      #   "${_target_network}" \
+      #   "SourceIndex" \
+      #   "_si" \
+      #   "${_si_version}"
       _evm_contract_source_get_opts_setup
       # TODO:
-      # evm-contract-source-get \
-      #   "${_evm_contract_source_get_opts[@]}"
-      #   "${_contract_address}"
+      evm-contract-source-get \
+        "${_evm_contract_source_get_opts[@]}"
+        "${_contract_address}"
       _msg_error \
         "Not implemented." \
         1
     fi
     if [[ -e "${_contract_file}" ]]; then
+      _contract_name="$( \
+        basename \
+          "${_contract_file%.sol}")"
+      _sum="$( \
+        _file_hash \
+          "${_contract_file}")"
+      _contract_dir="${_cache_dir}/${_sum}"
       _solidity_compiler_opts_setup \
         "${_bytecode_verify}"
+      _bytecode_runtime_output="${_contract_dir}/${_contract_name}.runtime.bin"
       _msg=(
-        "Building ${_contract_file}"
-        "runtime bytecode with options"
-        "'${_solidity_compiler_opts[*]}'."
+        "Building local contract file"
+        "'${_contract_file}'"
+        "runtime bytecode in '${_bytecode_runtime_output}'"
+        "with options '${_solidity_compiler_opts[*]}'."
       )
       _msg_info \
         "${_msg[*]}"
       solidity-compiler \
         "${_solidity_compiler_opts[@]}" \
         "${_contract_file}"
+      _msg=(
+        "Built runtime bytecode"
+        "'${_contract_dir}/${_contract_name}.runtime.bin' local contract file"
+        "'${_contract_file}'"
+        "runtime bytecode with options"
+        "'${_solidity_compiler_opts[*]}'."
+      )
     elif [[ ! -e "${_contract_file}" ]]; then
       _msg=(
         _msg_error \
@@ -374,17 +304,6 @@ _evm_contract_source_verify() {
       "${_msg[*]}" \
       1
   fi
-  # _contract_artifacts_auto_detect \
-  #   "${_deployments_dir}" \
-  #   "${_target_network}" \
-  #   "SourceIndex" \
-  #   "_si" \
-  #   "${_si_version}"
-  # _namespace="$( \
-  #   evm-wallet \
-  #    get \
-  #      "${_wallet_name}" \
-  #      "address")"
 }
 
 _set_overrides() {
