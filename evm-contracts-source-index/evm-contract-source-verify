@@ -81,7 +81,7 @@ _requirements() {
 _get_conf_dir_path() {
   local \
     _dir
-  _dir="${HOME}/.config/evmfs"
+  _dir="${HOME}/.config/${app_name}"
   echo \
     "${_dir}"
 }
@@ -508,189 +508,6 @@ _secret_auto_detect() {
     "${_path}"
 }
 
-_deployments_dir_auto_detect() {
-  local \
-    _user_level \
-    _evm_contract_deployments_dir_opts=() \
-    _deployments_dir \
-    _system_deployments
-  _user_level="$( \
-    _get \
-      "user" \
-      "level")"
-  if [[ "${_user_level}" == "y" ]]; then
-    _evm_contract_deployments_dir_opts+=(
-      -u
-    )
-  fi
-  _deployments_dir="$( \
-    evm-contract-deployments-dir \
-      "${_evm_contract_deployments_dir_opts[@]}" \
-      "evmfs")"
-  if [[ ! -d "${_deployments_dir}" ]]; then
-    _system_deployments="$( \
-     evm-contract-deployments-dir \
-       "evmfs")"
-    _msg=(
-      "user deployments directory"
-      "'${_deployments_dir}' does"
-      "not exists, importing system deployments"
-      "directory '${_system_deployments}'"
-    )
-    _msg_info \
-      "${_msg[*]}"
-    mkdir \
-      -p \
-      "${_deployments_dir}"
-    chmod \
-      700 \
-      "${_deployments_dir}"
-    cp \
-     -r \
-     "${_system_deployments}/"* \
-     "${_deployments_dir}"
-  fi
-  _set_override \
-    "deployments" \
-    "dir" \
-    "${_deployments_dir}"
-}
-
-_network_auto_detect() {
-  local \
-    _contract \
-    _contract_deployment \
-    _deployments \
-    _user \
-    _msg=()
-  _contract="FileSystem"
-  _deployments="$( \
-    _get \
-      "deployments" \
-      "dir")"
-  _contract_deployment="${_deployments}/${_contract}"
-  _user="$( \
-    _get \
-      "user" \
-      "level")"
-  if [[ "${_user}" == "y" ]]; then
-    _msg=(
-     "User deployments enabled, looking"
-     "for cheapest network deployments at" 
-     "path '${_contract_deployment}'"
-   )
-   _msg_info \
-     "${_msg[*]}"
-  fi
-  _network="$( \
-    evm-contract-deployment-networks \
-      -C \
-      "${_contract_deployment}")"
-  if [[ "${_user}" == "y" ]]; then
-    _msg=(
-      "Found network '${_network}'"
-    )
-    _msg_info \
-      "${_msg[*]}"
-  fi
-  _set_override \
-    "target" \
-    "network" \
-    "${_network}"
-}
-
-_fs_version_auto_detect() {
-  local \
-    _config \
-    _deployments \
-    _network \
-    _version
-  _deployments="$( \
-    _get \
-      "deployments" \
-      "dir")"
-  _network="$( \
-    _get \
-      "target" \
-      "network")"
-  _config="${_deployments}/FileSystem/${_network}/config.sh"
-  _version="$( \
-    evm-contract-deployment-versions \
-      -H \
-      "${_config}")"
-  _set_override \
-    "fs" \
-    "version" \
-    "${_version}"
-}
-
-_fs_address_auto_detect() {
-  local \
-    _address \
-    _network \
-    _deployments \
-    _user \
-    _version \
-    _evm_contract_deployment_address_opts=() \
-    _msg=()
-  _network="$( \
-    _get \
-      "target" \
-      "network")"
-  _evm_contract_deployment_address_opts+=(
-    -n
-      "${_network}"
-  )
-  _version="$( \
-    _get \
-      "fs" \
-      "version")"
-  if [[ "${_version}" != "" ]]; then
-    _evm_contract_deployment_address_opts+=(
-      -V
-        "${_version}"
-    )
-  fi
-  _user="$( \
-    _get \
-      "user" \
-      "level")"
-  if [[ "${_user}" == "n" ]]; then
-    _evm_contract_deployment_address_opts+=(
-      -a
-        "evmfs"
-    )
-  elif [[ "${_user}" == "y" ]]; then
-    _deployments="$( \
-      _get \
-        "deployments" \
-        "dir")"
-    _evm_contract_deployment_address_opts+=(
-      -u
-      -d
-        "${_deployments}" 
-    )
-  fi
-  _address="$( \
-    evm-contract-deployment-address \
-      "${_evm_contract_deployment_address_opts[@]}" \
-      "FileSystem")"
-  if [[ "${_address}" == "" ]]; then
-    _msg=(
-      "error getting FileSystem version"
-      "${_version} deployment address"
-      "for network '${_network}'"
-    )
-    _msg_error \
-      "${_msg[*]}" \
-      1
-  fi
-  _set_override \
-    "fs" \
-    "address" \
-    "${_address}"
-}
-
 _set_overrides() {
   if [[ -v override_quiet ]]; then
     quiet="${override_quiet}"
@@ -741,7 +558,7 @@ _set_overrides() {
     "${call_auth}"
   _set_override \
     "bytecode" \
-    "verification" \
+    "verify" \
     "runtime"
   _set_override \
     "evm" \
@@ -893,6 +710,7 @@ _requirements
 _config_user_init \
   "${app_name}"
 _libevm_global_variables
+_libevm_app_global_variables
 # shellcheck disable=SC2034
 getopts_opts="$( \
   printf \
