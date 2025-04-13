@@ -1031,11 +1031,13 @@ _evm_contract_source_get() {
       _contract_data_save \
         "compiler_version" \
         "${_compiler_version}"
-      _contract_data_save \
-	"tx_deployment" \
-	"${_tx_deployment}"
-      if [[ "${_tx_deployment}" != "" ]]; then
+      if [[ "${_tx_deployment}" == "" ]]; then
+        _tx_deployment_retrieve \
+          "${_retrieve_opts[@]}"
       fi
+      _contract_data_save \
+        "tx_deployment" \
+        "${_tx_deployment}"
     elif [[ "${_output_type}" != "all" ]]; then
       "_${_output_type}_retrieve"
       if [[ "${_output_type}" != "contract_source" ]]; then
@@ -1076,9 +1078,18 @@ _evm_contract_source_get() {
         mv \
           "${_publisher_dir}/${_contract_address}.sol" \
           "${_output_dir}"
-	mv \
-          "${_publisher_dir}/"*".txt" \
-	  "${_output_dir}"
+        mv \
+          "${_publisher_dir}/"{"contract_compiler","evm_version","compiler_version"}".txt" \
+          "${_output_dir}"
+      if [[ "${deployer}" != "" ]]; then
+        mv \
+          "${_publisher_dir}/tx_deployment.txt" \
+	  "${output_dir}"
+	echo \
+	  "${_deployer}" > \
+          "${_output_dir}/deployer.txt"
+      fi
+
       fi
       break
     fi
