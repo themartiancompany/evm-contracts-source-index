@@ -343,7 +343,7 @@ _evm_contract_source_verify() {
         "${_contract_network}" \
         "${_contract_address}"
       _msg_error \
-        "Not implemented." \
+        "Retrieving source code not implemented." \
         1
     fi
     if [[ "${_transaction_deployment}" != "" ]]; then
@@ -375,7 +375,7 @@ _evm_contract_source_verify() {
       _msg_info \
         "${_msg[*]}"
       _msg_error \
-        "Not implemented." \
+        "Retrieving deployment transaction from the Index not implemented." \
         1
       # TODO:
       # _evm_contract_source_get_opts_setup
@@ -421,7 +421,7 @@ _evm_contract_source_verify() {
         "${_msg[*]}"
     elif [[ ! -e "${_contract_file}" ]]; then
       _msg=(
-          "Not implemented."
+          "Automatically retrieving contract file not implemented."
       )
       _msg_error \
         "${_msg[*]}" \

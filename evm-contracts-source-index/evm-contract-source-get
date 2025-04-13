@@ -894,7 +894,7 @@ _evm_contract_source_verify_opts_setup() {
     -b
       "runtime"
     -i
-      "${_output_dir}/${_contract_address}.sol"
+      "${_publisher_dir}/${_contract_address}.sol"
   )
   if [[ "${quiet}" == "n" ]]; then
     _evm_contract_source_verify_opts+=(
@@ -1080,6 +1080,10 @@ _evm_contract_source_get() {
       # TODO WIP:
       #   bytecode verification.
       _evm_contract_source_verify_opts_setup
+        evm-contract-source-verify \
+          "${_evm_contract_source_verify_opts[@]}" \
+          "${_contract_network}" \
+          "${_contract_address}"
       _verified="$( \
         evm-contract-source-verify \
           "${_evm_contract_source_verify_opts[@]}" \
