@@ -431,7 +431,7 @@ _evm_contract_source_verify() {
       cat \
         "${_bytecode_deployed_path}")"
     _msg=(
-      "Deployed bytecode length:"
+      "Deployed bytecode '${_bytecode_deployed_path}' length:"
       "'${#_bytecode_deployed}'."
     )
     _msg_info \
