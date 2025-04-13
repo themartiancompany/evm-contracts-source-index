@@ -128,6 +128,29 @@ _work_dir_setup() {
     "${_tmp_dir}"
 }
 
+_evm_contract_bytecode_get_opts_setup() {
+  _evm_contract_bytecode_get_opts=()
+  if [[ "${quiet}" == "n" ]]; then
+    _evm_contract_bytecode_get_opts+=(
+      -v
+    )
+  fi
+  _evm_contract_bytecode_get_opts+=(
+    -t
+      "${_bytecode_verify}"
+  )
+  if [[ "${_contract_network}" != "" ]]; then
+    _evm_contract_bytecode_get_opts+=(
+      -n
+        "${_contract_network}"
+    )
+  _evm_contract_bytecode_get_opts+=(
+    -n
+      "${_contract_network}"
+  )
+  fi
+}
+
 _evm_contract_source_get_opts_setup() {
   if [[ "${quiet}" == "n" ]]; then
     _evm_contract_source_get_opts+=(
@@ -244,6 +267,7 @@ _evm_contract_source_verify() {
     _evm_contract_source_get_opts=() \
     _contract_dir \
     _solidity_compiler_opts=() \
+    _evm_contract_bytecode_get_opts=() \
     _bytecode_runtime \
     _bytecode_runtime_output \
     _si_abi \
@@ -287,7 +311,21 @@ _evm_contract_source_verify() {
         "Not implemented." \
         1
     fi
-    if [[ "${_transaction_deployment}" == "" ]]; then
+    if [[ "${_transaction_deployment}" != "" ]]; then
+      _msg=(
+        "Getting bytecode for"
+        "deployment transaction"
+        "'${_transaction_deployment}'"
+        "on network '${_contract_network}'."
+      )
+      _msg_info \
+        "${_msg[*]}"
+      _evm_contract_bytecode_get_opts_setup
+      evm-contract-bytecode-get \
+        "${_evm_contract_bytecode_get_opts[@]}" \
+        "${_contract_address}" # \
+        # "${_transaction_deployment}"
+    elif [[ "${_transaction_deployment}" == "" ]]; then
       _msg=(
         "No deployment transaction specified,"
         "retrieving from the Index."
@@ -348,6 +386,8 @@ _evm_contract_source_verify() {
       )
       _msg_info \
         "${_msg[*]}"
+      # echo \
+      #   "${_bytecode_runtime}"
     elif [[ ! -e "${_contract_file}" ]]; then
       _msg=(
           "Not implemented."
