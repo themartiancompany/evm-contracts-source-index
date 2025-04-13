@@ -280,7 +280,7 @@ _solidity_compiler_opts_setup() {
   fi
   if [[ "${_bytecode_verify}" == "runtime" ]]; then
     _solidity_compiler_opts+=(
-      -o
+      -t
         "bytecode_runtime"
     )
   fi
@@ -503,7 +503,7 @@ $(_display_networks \
      -i <contract_file>     If not specified will try to get
                             one from the index.
                             Default: ${contract_file}
-     -b <bytecode_verify>   It can be 'standalone' or 'bulk'
+     -b <bytecode_verify>   It can be 'runtime'.
                             Default: ${bytecode_verify}
      -e <evm_version>       EVM version for the contract.
                             Default: ${evm_version}
