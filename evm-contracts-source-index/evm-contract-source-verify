@@ -94,50 +94,50 @@ _cache_dir_auto_detect() {
     "${_dir}"
 }
 
-_chunk_verify() {
-  local \
-    _contract="${1}" \
-    _namespace="${2}" \
-    _sum="${3}" \
-    _index="${4}" \
-    _chunk="${5}" \
-    _remote \
-    _verify_dir \
-    _local_sum \
-    _remote_sum \
-    _msg=()
-  _verify_dir="${_cache_dir}/${_sum}/verify"
-  _remote="${_verify_dir}/${_index}"
-  mkdir \
-    -p \
-    "${_verify_dir}"
-  evm-contract-call \
-    "${_verify_call_opts[@]}" \
-    "${_fs_address}" \
-    "chunks" \
-    "${_namespace}" \
-    "${_sum}" \
-    "${_index}" > \
-    "${_remote}"
-  _local_sum="$( \
-    _file_hash \
-      "${_chunk}")"
-  _remote_sum="$( \
-    _file_hash \
-      "${_remote}")"
-  if [[ "${_local_sum}" != "${_remote_sum}" ]]; then
-    _msg=(
-      "somehow local chunk '${_chunk}',"
-      "corresponding to chunk having"
-      "index '${_index}' on the blockchain"
-      "has not been written correctly"
-      "on the blockchain at address '$(_publishing_address_get)'"
-    )
-    _msg_error \
-      "${_msg[*]}" \
-      1
-  fi
-}
+# _chunk_verify() {
+#   local \
+#     _contract="${1}" \
+#     _namespace="${2}" \
+#     _sum="${3}" \
+#     _index="${4}" \
+#     _chunk="${5}" \
+#     _remote \
+#     _verify_dir \
+#     _local_sum \
+#     _remote_sum \
+#     _msg=()
+#   _verify_dir="${_cache_dir}/${_sum}/verify"
+#   _remote="${_verify_dir}/${_index}"
+#   mkdir \
+#     -p \
+#     "${_verify_dir}"
+#   evm-contract-call \
+#     "${_verify_call_opts[@]}" \
+#     "${_fs_address}" \
+#     "chunks" \
+#     "${_namespace}" \
+#     "${_sum}" \
+#     "${_index}" > \
+#     "${_remote}"
+#   _local_sum="$( \
+#     _file_hash \
+#       "${_chunk}")"
+#   _remote_sum="$( \
+#     _file_hash \
+#       "${_remote}")"
+#   if [[ "${_local_sum}" != "${_remote_sum}" ]]; then
+#     _msg=(
+#       "somehow local chunk '${_chunk}',"
+#       "corresponding to chunk having"
+#       "index '${_index}' on the blockchain"
+#       "has not been written correctly"
+#       "on the blockchain at address '$(_publishing_address_get)'"
+#     )
+#     _msg_error \
+#       "${_msg[*]}" \
+#       1
+#   fi
+# }
 
 _sum_get() {
   local \
@@ -178,86 +178,101 @@ _work_dir_setup() {
     "${_tmp_dir}"
 }
 
-_file_encode() {
-  local \
-    _msg=() \
-    _length
-  _length=22000
-  _chunk_prefix="$( \
-    mktemp \
-      -u \
-      -p \
-      "${_tmp_dir}" \
-      --suffix=".base64")"
-  _file_size_check \
-    "${_file}"
-  _bin2txt_opts+=(
-    -L
-      "${_length}"
-  )
-  if [[ "${quiet}" == "n" ]]; then
-    _bin2txt_opts+=(
-      -v
-    )
-  fi
-  _msg=(
-    "encoding file with base64 encoding"
-    "and splitting it into 22000 characters"
-    "chunks"
-  )
-  _msg_info \
-    "${_msg[*]}"
-  bin2txt \
-    "${_bin2txt_opts[@]}" \
-    "${_file}" \
-    "${_chunk_prefix}"
-}
+# _file_encode() {
+#   local \
+#     _msg=() \
+#     _length
+#   _length=22000
+#   _chunk_prefix="$( \
+#     mktemp \
+#       -u \
+#       -p \
+#       "${_tmp_dir}" \
+#       --suffix=".base64")"
+#   _file_size_check \
+#     "${_file}"
+#   _bin2txt_opts+=(
+#     -L
+#       "${_length}"
+#   )
+#   if [[ "${quiet}" == "n" ]]; then
+#     _bin2txt_opts+=(
+#       -v
+#     )
+#   fi
+#   _msg=(
+#     "encoding file with base64 encoding"
+#     "and splitting it into 22000 characters"
+#     "chunks"
+#   )
+#   _msg_info \
+#     "${_msg[*]}"
+#   bin2txt \
+#     "${_bin2txt_opts[@]}" \
+#     "${_file}" \
+#     "${_chunk_prefix}"
+# }
 
-_evm_contract_source_get_opts_setup() {
-  if [[ "${_wallet_name}" != "" ]]; then
-    _evm_contract_source_get_opts+=(
-      -N
-        "${_wallet_name}"
-    )
-  fi
-  if [[ "${_wallet_seed}" != "" ]]; then
-    _evm_contract_source_get_opts+=(
-      -s
-        "${_wallet_seed}"
-    )
-  fi
-  if [[ "${_wallet_seed}" != "" ]]; then
-    _evm_contract_source_get_opts+=(
-      -s
-        "${_wallet_seed}"
-    )
-  fi
-  if [[ "${_wallet_password}" != "" ]]; then
-    _evm_contract_source_get_opts+=(
-      -p
-        "${_wallet_password}"
-    )
-  fi
-  if [[ "${_api_key_path}" != "" ]]; then
-    _evm_contract_source_get_opts+=(
-      -k
-        "${_api_key_path}"
-    )
-  fi
-  if [[ "${_target_network}" != "" ]]; then
-    _evm_contract_source_get_opts+=(
-      -n
-        "${_target_network}"
-    )
-  fi
-
-}
+# _evm_contract_source_get_opts_setup() {
+#   if [[ "${_wallet_name}" != "" ]]; then
+#     _evm_contract_source_get_opts+=(
+#       -N
+#         "${_wallet_name}"
+#     )
+#   fi
+#   if [[ "${_wallet_seed}" != "" ]]; then
+#     _evm_contract_source_get_opts+=(
+#       -s
+#         "${_wallet_seed}"
+#     )
+#   fi
+#   if [[ "${_wallet_seed}" != "" ]]; then
+#     _evm_contract_source_get_opts+=(
+#       -s
+#         "${_wallet_seed}"
+#     )
+#   fi
+#   if [[ "${_wallet_password}" != "" ]]; then
+#     _evm_contract_source_get_opts+=(
+#       -p
+#         "${_wallet_password}"
+#     )
+#   fi
+#   if [[ "${_api_key_path}" != "" ]]; then
+#     _evm_contract_source_get_opts+=(
+#       -k
+#         "${_api_key_path}"
+#     )
+#   fi
+#   if [[ "${_target_network}" != "" ]]; then
+#     _evm_contract_source_get_opts+=(
+#       -n
+#         "${_target_network}"
+#     )
+#   fi
+# }
 
 _solidity_compiler_opts_setup() {
-  _solidity_compiler_opts=()
+  _solidity_compiler_opts=(
+    # Only solc supported for now.
+    -b
+      "solc"
+  )
   if [[ "${quiet}" == "n" ]]; then
     _solidity_compiler_opts+=(
       -v
+    )
+  fi
+  if [[ "${_solc_version}" != "" ]]; then
+    _solidity_compiler_opts+=(
+      -C
+        "${_solc_version}"
+    )
+  fi
+  if [[ "${_evm_version}" != "" ]]; then
+    _solidity_compiler_opts+=(
+      -e
+        "${_evm_version}"
     )
   fi
 }
