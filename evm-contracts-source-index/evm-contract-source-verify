@@ -495,7 +495,7 @@ _show_config() {
   _msg_info "     Source Index version:   ${si_version}"
   _msg_info "    Credentials options:"
   _msg_info "              Wallet name:   ${wallet_name}"
-  jmsg_info "              Wallet path:   ${wallet_path}"
+  _msg_info "              Wallet path:   ${wallet_path}"
   _msg_info "          Wallet password:   ${wallet_password}"
   _msg_info "              Wallet seed:   ${wallet_seed}"
   _msg_info "                  API key:   ${api_key}"
