@@ -341,8 +341,8 @@ _evm_contract_source_verify() {
         "${_msg[*]}"
       evm-contract-bytecode-get \
         "${_evm_contract_bytecode_get_opts[@]}" \
-        "${_contract_address}" # \
-        # "${_transaction_deployment}"
+        "${_contract_address}" \
+        "${_transaction_deployment}"
     elif [[ "${_transaction_deployment}" == "" ]]; then
       _msg=(
         "No deployment transaction specified,"
