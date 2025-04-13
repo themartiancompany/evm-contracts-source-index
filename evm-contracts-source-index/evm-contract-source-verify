@@ -279,8 +279,10 @@ _evm_contract_source_verify() {
     _contract_dir \
     _solidity_compiler_opts=() \
     _evm_contract_bytecode_get_opts=() \
+    _bytecode_deployed \
+    _bytecode_deployed_path \
     _bytecode_runtime \
-    _bytecode_runtime_output \
+    _bytecode_runtime_path \
     _si_abi \
     _si_bytecode \
     _si_compiler_output \
@@ -374,11 +376,11 @@ _evm_contract_source_verify() {
       _solidity_compiler_opts_setup \
         "${_bytecode_verify}"
       # This needs to be adjusted
-      _bytecode_runtime_output="${_contract_dir}/${_contract_name}.runtime.bin"
+      _bytecode_runtime_path="${_contract_dir}/${_contract_name}.runtime.bin"
       _msg=(
         "Building local contract file"
         "'${_contract_file}'"
-        "runtime bytecode in '${_bytecode_runtime_output}'"
+        "runtime bytecode in '${_bytecode_runtime_path}'"
         "with options '${_solidity_compiler_opts[*]}'."
       )
       _msg_info \
@@ -388,15 +390,13 @@ _evm_contract_source_verify() {
         "${_contract_file}"
       _msg=(
         "Built runtime bytecode"
-        "'${_bytecode_runtime_output}'"
+        "'${_bytecode_runtime_path}'"
         "local contract file '${_contract_file}'"
         "runtime bytecode with options"
         "'${_solidity_compiler_opts[*]}'."
       )
       _msg_info \
         "${_msg[*]}"
-      # echo \
-      #   "${_bytecode_runtime}"
     elif [[ ! -e "${_contract_file}" ]]; then
       _msg=(
           "Not implemented."
@@ -407,7 +407,7 @@ _evm_contract_source_verify() {
     fi
     _bytecode_runtime="0x$( \
       cat \
-        "${_bytecode_runtime_output}")"
+        "${_bytecode_runtime_path}")"
     _msg=(
       "Runtime bytecode length:"
       "'${#_bytecode_runtime}'."
@@ -416,7 +416,7 @@ _evm_contract_source_verify() {
       "${_msg[*]}"
     _bytecode_deployed="$( \
       cat \
-        "${_bytecode_deployed_output}")"
+        "${_bytecode_deployed_path}")"
     _msg=(
       "Deployed bytecode length:"
       "'${#_bytecode_deployed}'."
