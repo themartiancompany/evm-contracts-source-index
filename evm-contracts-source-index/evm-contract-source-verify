@@ -254,6 +254,8 @@ _work_dir_setup() {
 # }
 
 _solidity_compiler_opts_setup() {
+  local \
+    _bytecode_verify="${1}"
   _solidity_compiler_opts=(
     # Only solc supported for now.
     -b
@@ -274,6 +276,12 @@ _solidity_compiler_opts_setup() {
     _solidity_compiler_opts+=(
       -e
         "${_evm_version}"
+    )
+  fi
+  if [[ "${_bytecode_verify}" == "runtime" ]]; then
+    _solidity_compiler_opts+=(
+      -o
+        "bytecode_runtime"
     )
   fi
 }
@@ -304,9 +312,9 @@ _evm_contract_source_verify() {
     _cmd \
     _args=() \
     _namespace \
-    _fs_abi \
-    _fs_bytecode \
-    _fs_compiler_output
+    _si_abi \
+    _si_bytecode \
+    _si_compiler_output
   shift \
     18
   _command_args+=(
@@ -334,7 +342,15 @@ _evm_contract_source_verify() {
         1
     fi
     if [[ -e "${_contract_file}" ]]; then
-      _solidity_compiler_opts_setup
+      _solidity_compiler_opts_setup \
+        "${_bytecode_verify}"
+      _msg=(
+        "Building ${_contract_file}"
+        "runtime bytecode with options"
+        "'${_solidity_compiler_opts[*]}'."
+      )
+      _msg_info \
+        "${_msg[*]}"
       solidity-compiler \
         "${_solidity_compiler_opts[@]}" \
         "${_contract_file}"
@@ -364,164 +380,11 @@ _evm_contract_source_verify() {
   #   "SourceIndex" \
   #   "_si" \
   #   "${_si_version}"
-  # _contract_data_retrieve
   # _namespace="$( \
   #   evm-wallet \
   #    get \
   #      "${_wallet_name}" \
   #      "address")"
-  # _fs_abi="$( \
-  #   _abi_get \
-  #     "${_deployments_dir}" \
-  #     "${_target_network}" \
-  #     "FileSystem" \
-  #     "${_fs_version}")"
-  # _fs_bytecode="$( \
-  #   _bytecode_get \
-  #     "${_deployments_dir}" \
-  #     "${_target_network}" \
-  #     "FileSystem" \
-  #     "${_fs_version}")"
-  # _fs_compiler_output="$( \
-  #   _compiler_output_get \
-  #     "${_deployments_dir}" \
-  #     "${_target_network}" \
-  #     "FileSystem" \
-  #     "${_fs_version}")"
-  # if [[ "${_upload_method}" == "standalone" ]]; then
-  #   _file_upload_standalone \
-  #     "${_target_network}" \
-  #     "${_fs_address}" \
-  #     "${_namespace}" \
-  #     "${_target_file}" \
-  #     "${_fs_abi}" \
-  #     "${_fs_bytecode}" \
-  #     "${_fs_compiler_output}"
-  # else
-  #   _msg_error \
-  #     "unknown upload method '${_upload_method}'"
-  # fi
-}
-
-_wallet_path_get() {
-  local \
-    _path \
-    _name
-  _name="$( \
-    _get \
-      "wallet" \
-      "name")"
-  _path="$( \
-    _get_conf_dir_path)/${_name}.dat"
-  echo \
-    "${_path}"
-}
-
-_secret_get() {
-  local \
-    _secret="${1}" \
-    _path \
-    _name
-  _name="$( \
-    _get \
-      "wallet" \
-      "name")"
-  _path="$( \
-    _get_conf_dir_path)/${_name}-${_secret}.txt"
-  echo \
-    "${_path}"
-}
-
-_api_key_auto_detect() {
-  local \
-    _chain="${1}" \
-    _chain_name \
-    _key \
-    _msg=()
-  _key="$( \
-    evm-chains-explorers \
-      -c \
-        "${_chain}" \
-      -s \
-        'kirsh' \
-      get \
-        keys)"
-  _chain_name="$( \
-    evm-chains-info \
-      -o \
-        "name" \
-      "${_chain}")"
-  if [[ ! -e "${_key}" ]]; then
-    _msg=(
-      "Found no provider services"
-      "keys for chain '${_chain_name}'."
-      "Check available service"
-      "providers with \"evm-chains-info"
-      "-o explorers '${_chain}'\""
-      "and add the relative api key in"
-      "'<user_home>/.config/evm-chains-explorers/<service>/default.txt'"
-    )
-    _msg_info \
-      "${_msg[*]}"
-  fi
-  _set_override \
-    "api" \
-    "key" \
-    "${_key}"
-}
-
-_secret_auto_detect() {
-  local \
-    _secret="${1}" \
-    _secret_type="${2}" \
-    _dir \
-    _key_gen_opts=() \
-    _msg=()
-  _path="$( \
-    _secret_get \
-      "${_secret}")"
-  _dir="$( \
-    dirname \
-      "${_path}")"
-  if [[ ! -e "${_path}" ]]; then
-    _key_gen_opts+=(
-      -t
-        "${_secret_type}"
-    )
-    _msg=(
-      "generating ${_secret} '${_path}'"
-    )
-    if [[ "${quiet}" == "n" ]]; then
-      _msg_info \
-        "${_msg[*]}"
-    fi
-    mkdir \
-      -p \
-      "${_dir}"
-    chmod \
-      700 \
-      "${_dir}"
-    chmod \
-      700 \
-      "${_dir}"
-    key-gen \
-      "${_key_gen_opts[@]}" \
-      "${_path}"
-    chmod \
-      400 \
-      "${_path}"
-    _msg=(
-      "${_secret} '${_path}' successfully generated"
-    )
-    if [[ "${quiet}" == "n" ]]; then
-      _msg_info \
-        "${_msg[*]}"
-    fi
-  fi
-  _set_override \
-    "wallet" \
-    "${_secret}" \
-    "${_path}"
 }
 
 _set_overrides() {
