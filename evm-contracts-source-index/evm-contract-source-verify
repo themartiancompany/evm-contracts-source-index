@@ -91,7 +91,15 @@ _cache_dir_auto_detect() {
   local \
     _dir
   _dir="${HOME}/.cache/${app_name}"
-  echo \
+  mkdir \
+    -p \
+    "${_dir}"
+  chmod \
+    700 \
+    "${_dir}"
+  _set_override \
+    "cache" \
+    "dir" \
     "${_dir}"
 }
 
@@ -193,7 +201,7 @@ _solidity_compiler_opts_setup() {
       -t
         "bytecode_runtime"
       -o
-        "${_cache_dir}/${_sum}"
+        "${_contract_dir}"
     )
   fi
 }
@@ -220,6 +228,7 @@ _evm_contract_source_verify() {
     _solc_version="${18}" \
     _command_args=() \
     _evm_contract_source_get_opts=() \
+    _contract_dir \
     _solidity_compiler_opts=() \
     _si_abi \
     _si_bytecode \
@@ -263,6 +272,9 @@ _evm_contract_source_verify() {
         _file_hash \
           "${_contract_file}")"
       _contract_dir="${_cache_dir}/${_sum}"
+      mkdir \
+        -p \
+        "${_contract_dir}"
       _solidity_compiler_opts_setup \
         "${_bytecode_verify}"
       _bytecode_runtime_output="${_contract_dir}/${_contract_name}.runtime.bin"
@@ -279,11 +291,13 @@ _evm_contract_source_verify() {
         "${_contract_file}"
       _msg=(
         "Built runtime bytecode"
-        "'${_contract_dir}/${_contract_name}.runtime.bin' local contract file"
-        "'${_contract_file}'"
+        "'${_contract_dir}/${_contract_name}.runtime.bin'"
+        "local contract file '${_contract_file}'"
         "runtime bytecode with options"
         "'${_solidity_compiler_opts[*]}'."
       )
+      _msg_info \
+        "${_msg[*]"
     elif [[ ! -e "${_contract_file}" ]]; then
       _msg=(
         _msg_error \
@@ -374,10 +388,7 @@ _set_overrides() {
     "contract" \
     "file" \
     ""
-  _set_override \
-    "cache" \
-    "dir" \
-    "$(_cache_dir_auto_detect)"
+  _cache_dir_auto_detect
   _contract_setup_auto_detect \
     "evm-contracts-source-index" \
     "SourceIndex" \
