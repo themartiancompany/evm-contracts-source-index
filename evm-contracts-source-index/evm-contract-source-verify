@@ -246,11 +246,25 @@ _solidity_compiler_opts_setup() {
   if [[ "${_bytecode_verify}" == "runtime" ]]; then
     _solidity_compiler_opts+=(
       -t
-        "bytecode_runtime"
+        # "bytecode_runtime"
+        'all'
       -o
         "${_contract_dir}"
     )
   fi
+}
+
+_bytecode_runtime_path_setup() {
+  local \
+    _find_opts=()
+  _find_opts+=(
+    -type
+      "f"
+  )
+  find \
+    "${_find_opts[@]}" \
+    "${_contract_dir}.runtime-bin"
+  echo "hello again"
 }
 
 _evm_contract_source_verify() {
@@ -375,6 +389,7 @@ _evm_contract_source_verify() {
         "${_contract_dir}"
       _solidity_compiler_opts_setup \
         "${_bytecode_verify}"
+      _bytecode_runtime_path_setup
       # This needs to be adjusted
       _bytecode_runtime_path="${_contract_dir}/${_contract_name}.runtime.bin"
       _msg=(
