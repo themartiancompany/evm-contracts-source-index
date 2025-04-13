@@ -425,10 +425,24 @@ _evm_contract_source_verify() {
       "${_msg[*]}"
     if [[ "${_bytecode_runtime}" == "${_bytecode_deployed}" ]]; then
       _msg=(
-        "The runtime bytecode for the provided source is correct."
+        "The source code '${_contract_file}'"
+        "and the contract at the deployment"
+        "transaction '${_transaction_deployment}' have the same"
+        "runtime bytecode."
       )
       echo \
         "${_msg[*]}"
+    elif [[ "${_bytecode_runtime}" != "${_bytecode_deployed}" ]]; then
+      _msg=(
+        "The runtime bytecode '${_bytecode_runtime_path}'"
+        "for the provided source '${_contract_file}' and the"
+        "deployed bytecode for the deployment transaction"
+        "'${_transaction_deployment}' saved in file"
+        "'${_bytecode_deployed_path}' are not the same."
+      )
+      _msg_error \
+        "${_msg[*]}" \
+        1
     fi
   else
     _msg=(
