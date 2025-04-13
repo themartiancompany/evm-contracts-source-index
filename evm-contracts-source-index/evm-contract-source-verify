@@ -269,6 +269,7 @@ _evm_contract_source_verify() {
       # TODO:
       evm-contract-source-get \
         "${_evm_contract_source_get_opts[@]}" \
+        "${_contract_network}" \
         "${_contract_address}"
       _msg_error \
         "Not implemented." \
