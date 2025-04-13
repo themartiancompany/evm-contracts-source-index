@@ -441,22 +441,24 @@ _evm_contract_source_verify() {
         cat \
           "${_bytecode_runtime_path}")"
       _msg=(
-        "Runtime bytecode length:"
+        "Runtime bytecode '${_bytecode_runtime_path}' length:"
         "'${#_bytecode_runtime}'."
       )
       _msg_info \
         "${_msg[*]}"
-      if [[ "${_bytecode_runtime}" == "${_bytecode_deployed}" ]]; then
-        _msg=(
-          "The source code '${_contract_file}'"
-          "and the contract at the deployment"
-          "transaction '${_transaction_deployment}'"
-          "have the same runtime bytecode for"
-          "'${_bytecode_runtime_path}'."
-        )
-        echo \
-          "${_msg[*]}"
-        break
+      if [[ "${#_bytecode_runtime}" == "${#_bytecode_deployed}" ]]; then
+        if [[ "${_bytecode_runtime}" == "${_bytecode_deployed}" ]]; then
+          _msg=(
+            "The source code '${_contract_file}'"
+            "and the contract at the deployment"
+            "transaction '${_transaction_deployment}'"
+            "have the same runtime bytecode for"
+            "'${_bytecode_runtime_path}'."
+          )
+          echo \
+            "${_msg[*]}"
+          break
+        fi
       fi
     done
     if [[ "${_bytecode_runtime}" != "${_bytecode_deployed}" ]]; then
