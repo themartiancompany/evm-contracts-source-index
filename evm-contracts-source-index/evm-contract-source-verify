@@ -132,6 +132,9 @@ _evm_contract_bytecode_get_opts_setup() {
   _evm_contract_bytecode_get_opts=()
   _bytecode_deployed_dir="${_cache_dir}/${_contract_network}/${_contract_address}"
   _bytecode_deployed_path="${_bytecode_deployed_dir}/runtime.txt"
+  mkdir \
+    -p \
+    "${_bytecode_deployed_dir}"
   if [[ "${quiet}" == "n" ]]; then
     _evm_contract_bytecode_get_opts+=(
       -v
