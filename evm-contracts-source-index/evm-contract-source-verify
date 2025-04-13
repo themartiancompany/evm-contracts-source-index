@@ -42,6 +42,7 @@ _sourced \
 # shellcheck disable=SC2034
 _global_variables() {
   verify_date=""
+  contract_network=""
   contract_address=""
   contract_file=""
   transaction_deployment=""
@@ -220,12 +221,13 @@ _evm_contract_source_verify() {
     _api_key_path="${10}" \
     _bytecode_verify="${11}" \
     _cache_dir="${12}" \
-    _contract_address="${13}" \
-    _target_publisher="${14}" \
-    _contract_file="${15}" \
-    _transaction_deployment="${16}" \
-    _evm_version="${17}" \
-    _solc_version="${18}" \
+    _contract_network="${13}" \
+    _contract_address="${14}" \
+    _target_publisher="${15}" \
+    _contract_file="${16}" \
+    _transaction_deployment="${17}" \
+    _evm_version="${18}" \
+    _solc_version="${19}" \
     _command_args=() \
     _evm_contract_source_get_opts=() \
     _contract_dir \
@@ -237,7 +239,7 @@ _evm_contract_source_verify() {
     _si_compiler_output \
     _sum
   shift \
-    18
+    19
   _command_args+=(
     "$@"
   )
@@ -380,6 +382,10 @@ _set_overrides() {
     "target" \
     "publisher" \
     ""
+  _set_override \
+    "contract" \
+    "network" \
+    "${target_network}"
   _deployments_dir_auto_detect \
     "evm-contracts-source-index" \
     "${user_level}"
@@ -439,11 +445,12 @@ _usage() {
       _usage_text << \
         ENDUSAGETEXT || true
 
-EVM network smart contract verifier
+EVM-compatible network smart contract source verifier
 
 Usage:
   ${app_name}
     [options]
+    <contract_network>
     <contract_address>
 
   networks:
@@ -518,6 +525,7 @@ _show_config() {
   _msg_info "        Verification date:   ${verify_date}"
   _msg_info "    Bytecode verification:   ${bytecode_verify}"
   _msg_info "         Contract address:   ${contract_address}"
+  _msg_info "         Contract network:   ${contract_network}"
   _msg_info "         Target publisher:   ${target_publisher}"
   _msg_info "          Contract source:   ${contract_file}"
   _msg_info "             Solc version:   ${solc_version}"
@@ -615,8 +623,19 @@ if (( $# < 1 )); then
   _usage \
     1
 fi
+if (( $# < 2 )); then
+  _msg_error \
+    "No contract address given." \
+    0
+  _set_overrides
+  _usage \
+    1
+fi
 if (( 0 < $# )); then
-  contract_address="${1}"
+  contract_network="${1}"
+fi
+if (( 1 < $# )); then
+  contract_address="${2}"
 fi
 shift \
   1 || \
@@ -639,6 +658,7 @@ app_opts=(
   "${api_key}"
   "${bytecode_verify}"
   "${cache_dir}"
+  "${contract_network}"
   "${contract_address}"
   "${target_publisher}"
   "${contract_file}"
