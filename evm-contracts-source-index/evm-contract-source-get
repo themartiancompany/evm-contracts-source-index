@@ -53,6 +53,9 @@ _requirements() {
     'evm-contract-deployment-networks' \
     'evm-contracts-tools'
   _check_cmd \
+    'evm-contract-source-verify' \
+    'evm-contracts-source-index'
+  _check_cmd \
     'evm-openpgp-key-receive' \
     'evm-openpgp-keyserver'
   _check_cmd \
@@ -825,7 +828,7 @@ _evm_version_check() {
   )
   if [[ " ${_evm_versions[*]} " != *" ${_data}  "* ]]; then
     _msg=(
-      "Invalid EVM version."
+      "Invalid EVM version '${_data}'."
     )
     _msg_error \
       "${_msg[*]}" \
@@ -1051,9 +1054,6 @@ _evm_contract_source_get() {
           "${_source_archive}" \
           "${_publisher_dir}" \
           "${_publisher}"
-	mv \
-          "${_publisher_dir}/${_contract_address}.sol" \
-	  "${_output_dir}"
         _retrieved="true"
       fi
     fi
@@ -1061,10 +1061,16 @@ _evm_contract_source_get() {
       # TODO WIP:
       #   bytecode verification.
       _evm_contract_source_verify_opts_setup
-      evm-contract-source-verify \
-        "${_evm_contract_source_verify_opts[@]}" \
-	"${_contract_network}" \
-	"${_contract_address}"
+      _verified="$( \
+        evm-contract-source-verify \
+          "${_evm_contract_source_verify_opts[@]}" \
+          "${_contract_network}" \
+          "${_contract_address}")"
+      if [[ "${_verified}" == "" ]]; then
+        mv \
+          "${_publisher_dir}/${_contract_address}.sol" \
+          "${_output_dir}"
+      fi
       break
     fi
   done
