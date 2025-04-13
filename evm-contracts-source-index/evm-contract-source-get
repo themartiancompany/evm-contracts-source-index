@@ -501,7 +501,6 @@ _deployer_get() {
   local \
     _publisher="${1}" \
     _evm_contract_deployer_get_opts=() \
-    _tx_deployment \
     _tx_null \
     _msg=()
   _tx_null="0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -875,6 +874,45 @@ _output_type_check() {
   fi
 }
 
+_evm_contract_source_verify_opts_setup() {
+  _evm_contract_source_verify_opts=(
+    -b
+      "runtime"
+    -i
+      "${_output_dir}/${_contract_address}.sol"
+  )
+  if [[ "${quiet}" == "n" ]]; then
+    _evm_contract_source_verify_opts+=(
+      -v
+    )
+  fi
+  if [[ "${_target_network}" != "" ]]; then
+    _evm_contract_source_verify_opts+=(
+      -n
+        "${_target_network}"
+    )
+  fi
+  if [[ "${_evm_version}" != "" ]]; then
+    _evm_contract_source_verify_opts+=(
+      -e
+        "${_evm_version}"
+    )
+  fi
+  if [[ "${_compiler_version}" != "" ]]; then
+    _evm_contract_source_verify_opts+=(
+      -S
+        "${_compiler_version}"
+    )
+  fi
+  if [[ "${_tx_deployment}" != "" ]]; then
+    _evm_contract_source_verify_opts+=(
+      -T
+        "${_tx_deployment}"
+    )
+  fi
+}
+
+
 _evm_contract_source_get() {
   local \
     _si_address="${1}" \
@@ -904,6 +942,7 @@ _evm_contract_source_get() {
     _si_bytecode \
     _si_compiler_output \
     _source_archive \
+    _tx_deployment \
     _evm_version \
     _contract_compiler \
     _compiler_version \
@@ -911,6 +950,7 @@ _evm_contract_source_get() {
     _gnupg_home \
     _evm_openpgp_keyserver_db_dir \
     _evm_openpgp_key_receive_opts=() \
+    _evm_contract_source_verify_opts=() \
     _value \
     _msg=()
   _output_type_check
@@ -992,7 +1032,7 @@ _evm_contract_source_get() {
         _value=$( \
           _get \
             "" \
-            "${_type}")
+            "${_output_type}")
         _contract_data_save
           "${_output_type}" \
           "${_value}" \
@@ -1017,8 +1057,13 @@ _evm_contract_source_get() {
       fi
     fi
     if [[ "${_retrieved}" == "true" ]]; then
-      # TODO:
+      # TODO WIP:
       #   bytecode verification.
+      _evm_contract_source_verify_opts_setup
+      evm-contract-source-verify \
+        "${_evm_contract_source_verify_opts[@]}" \
+	"${_contract_network}" \
+	"${_contract_address}"
       break
     fi
   done
