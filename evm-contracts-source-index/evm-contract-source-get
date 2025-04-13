@@ -796,7 +796,7 @@ _contract_compiler_check() {
     "serpent"
     "solc"
   )
-  if [[ " ${_compilers[*]} " != *" ${_data}  "* ]]; then
+  if [[ " ${_compilers[*]} " != *" ${_data} "* ]]; then
     _msg=(
       "Invalid compiler."
     )
