@@ -1031,7 +1031,8 @@ _evm_contract_source_get() {
       _contract_data_save \
         "compiler_version" \
         "${_compiler_version}"
-      if [[ "${_tx_deployment}" == "" ]]; then
+      if [[ ! -v "_tx_deployment" ]] || \
+         [[ "${_tx_deployment}" == "" ]]; then
         _tx_deployment_retrieve \
           "${_retrieve_opts[@]}"
       fi
@@ -1494,6 +1495,13 @@ else
   contract_address="$( \
     _lower \
       "${2}")"
+fi
+if [[ "${contract_address}" == "" ]]; then
+  _msg_error \
+    "No contract address specified." \
+    0
+  _usage \
+    1
 fi
 _set_overrides
 app_opts+=(
