@@ -409,7 +409,7 @@ _evm_contract_source_verify() {
       solidity-compiler \
         "${_solidity_compiler_opts[@]}" \
         "${_contract_file}"
-      _bytecode_runtimes_paths_find
+      _bytecode_runtime_paths_find
       _msg=(
         "Built runtime bytecode"
         "'${_bytecode_runtime_paths[@]}'"
@@ -428,9 +428,8 @@ _evm_contract_source_verify() {
         1
     fi
     for _bytecode_runtime_path in "${_bytecode_runtime_paths[@]}"; do
-              
+      echo "hi ${_bytecode_runtime_path}"              
     done
-
     _bytecode_runtime="0x$( \
       cat \
         "${_bytecode_runtime_path}")"
