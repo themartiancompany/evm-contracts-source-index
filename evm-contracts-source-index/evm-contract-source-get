@@ -851,7 +851,8 @@ _contract_data_save() {
       "${_msg[*]}" \
       1
   fi
-  "_${_type}_check"
+  "_${_type}_check" \
+    "${_data}"
   echo \
     "${_data}" > \
     "${_output_file}"
