@@ -51,6 +51,7 @@ _global_variables() {
   solc_version=""
   evm_version=""
   target_network=""
+  target_publisher=""
   cache_dir=""
   command_args=()
   color=""
@@ -558,6 +559,10 @@ _set_overrides() {
     "rpc" \
     "selection" \
     "kirsh"
+  _set_override \
+    "target" \
+    "publisher" \
+    ""
   _deployments_dir_auto_detect \
     "evm-contracts-source-index" \
     "${user_level}"
@@ -730,7 +735,7 @@ _libevm_app_global_variables
 getopts_opts="$( \
   printf \
     "%s" \
-    "i:b:e:S:T:" \
+    "i:b:e:S:T:P:" \
     "A:V:" \
     "$(_libevm_app_getopts_params_get)" \
     "n:" \
@@ -753,7 +758,9 @@ while \
     S) \
       override_solc_version="${OPTARG}" ;;
     T) \
-      override_tnansaction_deployment="${OPTARG}" ;;
+      override_transaction_deployment="${OPTARG}" ;;
+    P) \
+      override_target_publisher="${OPTARG}" ;;
     A) \
       override_si_address="${OPTARG}" ;;
     V) \
