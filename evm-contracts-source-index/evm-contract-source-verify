@@ -395,15 +395,6 @@ _evm_contract_source_verify() {
       )
       _msg_info \
         "${_msg[*]}"
-      _bytecode_runtime="0x$( \
-        cat \
-          "${_bytecode_runtime_output}")"
-      _msg=(
-        "Runtime bytecode length:"
-        "'${#_bytecode_runtime}'."
-      )
-      _msg_info \
-        "${_msg[*]}"
       # echo \
       #   "${_bytecode_runtime}"
     elif [[ ! -e "${_contract_file}" ]]; then
@@ -413,6 +404,31 @@ _evm_contract_source_verify() {
       _msg_error \
         "${_msg[*]}" \
         1
+    fi
+    _bytecode_runtime="0x$( \
+      cat \
+        "${_bytecode_runtime_output}")"
+    _msg=(
+      "Runtime bytecode length:"
+      "'${#_bytecode_runtime}'."
+    )
+    _msg_info \
+      "${_msg[*]}"
+    _bytecode_deployed="$( \
+      cat \
+        "${_bytecode_deployed_output}")"
+    _msg=(
+      "Deployed bytecode length:"
+      "'${#_bytecode_deployed}'."
+    )
+    _msg_info \
+      "${_msg[*]}"
+    if [[ "${_bytecode_runtime}" == "${_bytecode_deployed}" ]]; then
+      _msg=(
+        "The runtime bytecode for the provided source is correct."
+      )
+      echo \
+        "${_msg[*]}"
     fi
   else
     _msg=(
