@@ -134,6 +134,18 @@ _evm_contract_source_get_opts_setup() {
       -v
     )
   fi
+  if [[ "${_si_address}" != "" ]]; then
+    _evm_contract_source_get_opts+=(
+      -A
+        "${_si_address}"
+    )
+  fi
+  if [[ "${_si_version}" != "" ]]; then
+    _evm_contract_source_get_opts+=(
+      -V
+        "${_si_version}"
+    )
+  fi
   if [[ "${_wallet_name}" != "" ]]; then
     _evm_contract_source_get_opts+=(
       -N
@@ -252,6 +264,12 @@ _evm_contract_source_verify() {
   _msg_info \
     "${_msg[*]}"
   if [[ "${_bytecode_verify}" == "runtime" ]]; then
+      _msg=(
+        "Bytecode verification:"
+        "'${_bytecode_verify}'."
+      )
+      _msg_info \
+        "${_msg[*]}"
     if [[ "${_contract_file}" == "" ]]; then
       _msg=(
         "No contract file specified,"
@@ -259,12 +277,6 @@ _evm_contract_source_verify() {
       )
       _msg_info \
         "${_msg[*]}"
-      # _contract_artifacts_auto_detect \
-      #   "${_deployments_dir}" \
-      #   "${_target_network}" \
-      #   "SourceIndex" \
-      #   "_si" \
-      #   "${_si_version}"
       _evm_contract_source_get_opts_setup
       # TODO:
       evm-contract-source-get \
@@ -276,14 +288,21 @@ _evm_contract_source_verify() {
         1
     fi
     if [[ "${_transaction_deployment}" == "" ]]; then
-      _evm_contract_source_get_opts_setup
-      # TODO:
-      evm-contract-source-get \
-        "${_evm_contract_source_get_opts[@]}"
-        "${_contract_address}"
+      _msg=(
+        "No deployment transaction specified,"
+        "retrieving from the Index."
+      )
+      _msg_info \
+        "${_msg[*]}"
       _msg_error \
         "Not implemented." \
         1
+      # TODO:
+      # _evm_contract_source_get_opts_setup
+      evm-contract-source-get \
+        "${_evm_contract_source_get_opts[@]}"
+        "${_contract_network}"
+        "${_contract_address}"
     fi
     if [[ -e "${_contract_file}" ]]; then
       _sum="$( \
@@ -420,6 +439,10 @@ _set_overrides() {
   _set_override \
     "contract" \
     "file" \
+    ""
+  _set_override \
+    "transaction" \
+    "deployment" \
     ""
   _cache_dir_auto_detect
   _contract_setup_auto_detect \
