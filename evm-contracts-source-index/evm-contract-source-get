@@ -837,7 +837,7 @@ _contract_data_save() {
   local \
     _type="${1}" \
     _data="${2}" \
-    _output_file="${3}" \
+    _output_file \
     _msg=()
   _output_file="${_output_dir}/${_type}.txt"
   if (( 2 < "$#" )); then
