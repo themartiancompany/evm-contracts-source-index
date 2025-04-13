@@ -400,7 +400,7 @@ _evm_contract_source_verify() {
           "${_bytecode_runtime_output}")"
       _msg=(
         "Runtime bytecode length:"
-        "'${#_bytecode_runtime_output}'."
+        "'${#_bytecode_runtime}'."
       )
       _msg_info \
         "${_msg[*]}"
