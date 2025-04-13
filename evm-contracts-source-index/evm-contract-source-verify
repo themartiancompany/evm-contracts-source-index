@@ -254,17 +254,24 @@ _solidity_compiler_opts_setup() {
   fi
 }
 
-_bytecode_runtime_path_setup() {
-  local \
-    _find_opts=()
-  _find_opts+=(
-    -type
-      "f"
-  )
-  find \
-    "${_find_opts[@]}" \
-    "${_contract_dir}.runtime-bin"
-  echo "hello again"
+_bytecode_runtime_paths_find() {
+  mapfile \
+    -d \
+    $'\0' \
+    _bytecode_runtime_paths < \
+    <(find \
+        "${_contract_dir}" \
+        -name \
+          "*.bin-runtime" \
+        -type \
+          "f" \
+        -print0 || \
+      true)
+  if [[ -e "${_contract_dir}/${_contract_name}.runtime.bin" ]]; then
+    _bytecode_runtime_paths+=(
+      "${_contract_dir}/${_contract_name}.runtime.bin"
+    )
+  fi
 }
 
 _evm_contract_source_verify() {
@@ -297,6 +304,7 @@ _evm_contract_source_verify() {
     _bytecode_deployed_path \
     _bytecode_runtime \
     _bytecode_runtime_path \
+    _bytecode_runtime_paths=() \
     _si_abi \
     _si_bytecode \
     _si_compiler_output \
@@ -389,13 +397,11 @@ _evm_contract_source_verify() {
         "${_contract_dir}"
       _solidity_compiler_opts_setup \
         "${_bytecode_verify}"
-      _bytecode_runtime_path_setup
       # This needs to be adjusted
-      _bytecode_runtime_path="${_contract_dir}/${_contract_name}.runtime.bin"
       _msg=(
         "Building local contract file"
-        "'${_contract_file}'"
-        "runtime bytecode in '${_bytecode_runtime_path}'"
+        "'${_contract_file}' in directory"
+        "'${_contract_dir}'"
         "with options '${_solidity_compiler_opts[*]}'."
       )
       _msg_info \
@@ -403,9 +409,10 @@ _evm_contract_source_verify() {
       solidity-compiler \
         "${_solidity_compiler_opts[@]}" \
         "${_contract_file}"
+      _bytecode_runtimes_paths_find
       _msg=(
         "Built runtime bytecode"
-        "'${_bytecode_runtime_path}'"
+        "'${_bytecode_runtime_paths[@]}'"
         "local contract file '${_contract_file}'"
         "runtime bytecode with options"
         "'${_solidity_compiler_opts[*]}'."
@@ -420,6 +427,10 @@ _evm_contract_source_verify() {
         "${_msg[*]}" \
         1
     fi
+    for _bytecode_runtime_path in "${_bytecode_runtime_paths[@]}"; do
+              
+    done
+
     _bytecode_runtime="0x$( \
       cat \
         "${_bytecode_runtime_path}")"
