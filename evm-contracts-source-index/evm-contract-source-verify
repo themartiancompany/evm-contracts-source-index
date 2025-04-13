@@ -230,6 +230,8 @@ _evm_contract_source_verify() {
     _evm_contract_source_get_opts=() \
     _contract_dir \
     _solidity_compiler_opts=() \
+    _bytecode_runtime \
+    _bytecode_runtime_output \
     _si_abi \
     _si_bytecode \
     _si_compiler_output \
@@ -264,19 +266,31 @@ _evm_contract_source_verify() {
         "Not implemented." \
         1
     fi
+    if [[ "${_transaction_deployment}" == "" ]]; then
+      _evm_contract_source_get_opts_setup
+      # TODO:
+      evm-contract-source-get \
+        "${_evm_contract_source_get_opts[@]}"
+        "${_contract_address}"
+      _msg_error \
+        "Not implemented." \
+        1
+    fi
+
     if [[ -e "${_contract_file}" ]]; then
-      _contract_name="$( \
-        basename \
-          "${_contract_file%.sol}")"
       _sum="$( \
         _file_hash \
           "${_contract_file}")"
       _contract_dir="${_cache_dir}/${_sum}"
+      _contract_name="$( \
+        basename \
+          "${_contract_file%.sol}")"
       mkdir \
         -p \
         "${_contract_dir}"
       _solidity_compiler_opts_setup \
         "${_bytecode_verify}"
+      # This needs to be adjusted
       _bytecode_runtime_output="${_contract_dir}/${_contract_name}.runtime.bin"
       _msg=(
         "Building local contract file"
@@ -291,18 +305,25 @@ _evm_contract_source_verify() {
         "${_contract_file}"
       _msg=(
         "Built runtime bytecode"
-        "'${_contract_dir}/${_contract_name}.runtime.bin'"
+        "'${_bytecode_runtime_output}'"
         "local contract file '${_contract_file}'"
         "runtime bytecode with options"
         "'${_solidity_compiler_opts[*]}'."
       )
       _msg_info \
         "${_msg[*]}"
+      _bytecode_runtime="0x$( \
+        cat \
+          "${_bytecode_runtime_output}")"
+      _msg=(
+        "Runtime bytecode length:"
+        "'${#_bytecode_runtime_output}'."
+      )
+      _msg_info \
+        "${_msg[*]}"
     elif [[ ! -e "${_contract_file}" ]]; then
       _msg=(
-        _msg_error \
-          "Not implemented." \
-          1
+          "Not implemented."
       )
       _msg_error \
         "${_msg[*]}" \

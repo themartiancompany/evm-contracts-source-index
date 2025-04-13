@@ -1214,7 +1214,7 @@ _usage() {
       _usage_text << \
         ENDUSAGETEXT || true
 
-Build recipes retrieval tool.
+EVM Contracts source retrieval tool.
 
 Usage:
   ${app_name}
