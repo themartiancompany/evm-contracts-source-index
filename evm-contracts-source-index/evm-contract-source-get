@@ -546,6 +546,7 @@ _deployer_get() {
     )
     _msg_info \
       "${_msg[*]}"
+    _tx_deployment=""
   elif [[ "${_deployer}" != "" ]]; then
     _msg=(
       "Found deployer '${_deployer}'."
@@ -1030,6 +1031,11 @@ _evm_contract_source_get() {
       _contract_data_save \
         "compiler_version" \
         "${_compiler_version}"
+      _contract_data_save \
+	"tx_deployment" \
+	"${_tx_deployment}"
+      if [[ "${_tx_deployment}" != "" ]]; then
+      fi
     elif [[ "${_output_type}" != "all" ]]; then
       "_${_output_type}_retrieve"
       if [[ "${_output_type}" != "contract_source" ]]; then
@@ -1071,7 +1077,7 @@ _evm_contract_source_get() {
           "${_publisher_dir}/${_contract_address}.sol" \
           "${_output_dir}"
 	mv \
-          "${_publisher_dir}/"{"evm_version","compiler_version"}".txt" \
+          "${_publisher_dir}/"*".txt" \
 	  "${_output_dir}"
       fi
       break
