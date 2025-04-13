@@ -427,18 +427,6 @@ _evm_contract_source_verify() {
         "${_msg[*]}" \
         1
     fi
-    for _bytecode_runtime_path in "${_bytecode_runtime_paths[@]}"; do
-      echo "hi ${_bytecode_runtime_path}"              
-    done
-    _bytecode_runtime="0x$( \
-      cat \
-        "${_bytecode_runtime_path}")"
-    _msg=(
-      "Runtime bytecode length:"
-      "'${#_bytecode_runtime}'."
-    )
-    _msg_info \
-      "${_msg[*]}"
     _bytecode_deployed="$( \
       cat \
         "${_bytecode_deployed_path}")"
@@ -448,22 +436,35 @@ _evm_contract_source_verify() {
     )
     _msg_info \
       "${_msg[*]}"
-    if [[ "${_bytecode_runtime}" == "${_bytecode_deployed}" ]]; then
+    for _bytecode_runtime_path in "${_bytecode_runtime_paths[@]}"; do
+      _bytecode_runtime="0x$( \
+        cat \
+          "${_bytecode_runtime_path}")"
       _msg=(
-        "The source code '${_contract_file}'"
-        "and the contract at the deployment"
-        "transaction '${_transaction_deployment}' have the same"
-        "runtime bytecode."
+        "Runtime bytecode length:"
+        "'${#_bytecode_runtime}'."
       )
-      echo \
+      _msg_info \
         "${_msg[*]}"
-    elif [[ "${_bytecode_runtime}" != "${_bytecode_deployed}" ]]; then
+      if [[ "${_bytecode_runtime}" == "${_bytecode_deployed}" ]]; then
+        _msg=(
+          "The source code '${_contract_file}'"
+          "and the contract at the deployment"
+          "transaction '${_transaction_deployment}'"
+          "have the same runtime bytecode for"
+          "'${_bytecode_runtime_path}'."
+        )
+        echo \
+          "${_msg[*]}"
+        break
+      fi
+    done
+    if [[ "${_bytecode_runtime}" != "${_bytecode_deployed}" ]]; then
       _msg=(
-        "The runtime bytecode '${_bytecode_runtime_path}'"
-        "for the provided source '${_contract_file}' and the"
-        "deployed bytecode for the deployment transaction"
-        "'${_transaction_deployment}' saved in file"
-        "'${_bytecode_deployed_path}' are not the same."
+        "None of runtime bytecode '${_bytecode_runtime_paths[*]}'"
+        "for the provided source '${_contract_file}' are the same as"
+        "deployed bytecode at file '${_bytecode_deployed_path}' for"
+        "the deployment transaction '${_transaction_deployment}'."
       )
       _msg_error \
         "${_msg[*]}" \
