@@ -275,7 +275,7 @@ _evm_contract_source_verify() {
     _target_network="${9}" \
     _api_key_path="${10}" \
     _bytecode_verify="${11}" \
-    _cache_dir="${12}" 
+    _cache_dir="${12}" \
     _contract_address="${13}" \
     _target_publisher="${14}" \
     _contract_file="${15}" \
@@ -296,8 +296,8 @@ _evm_contract_source_verify() {
   _command_args+=(
     "$@"
   )
-  if [[ "${quiet}" == "n" ]]; then
-  fi
+  # if [[ "${quiet}" == "n" ]]; then
+  # fi
   _msg=(
     "Verifying source for"
     "contract '${_contract_address}'"
@@ -869,14 +869,9 @@ _show_config() {
   _msg_info "          Contract source:   ${contract_file}"
   _msg_info "             Solc version:   ${solc_version}"
   _msg_info "              EVM version:   ${evm_version}"
-  _msg_info "   Deployment transaction:   ${transaction_deployment}"
   _msg_info "       Contract options:"
   _msg_info "     Source Index address:   ${si_address}"
   _msg_info "     Source Index version:   ${si_version}"
-  _msg_info "         LibEVM options:"
-  _msg_info "               User level:   ${user_level}"
-  _msg_info "    Deployments directory:   ${deployments_dir}"
-  _msg_info "           Target network:   ${target_network}"
   _msg_info "    Credentials options:"
   _msg_info "              Wallet name:   ${wallet_name}"
   jmsg_info "              Wallet path:   ${wallet_path}"
@@ -884,6 +879,10 @@ _show_config() {
   _msg_info "              Wallet seed:   ${wallet_seed}"
   _msg_info "                  API key:   ${api_key}"
   _msg_info "           Wallet address:   ${wallet_address}"
+  _msg_info "         LibEVM options:"
+  _msg_info "               User level:   ${user_level}"
+  _msg_info "    Deployments directory:   ${deployments_dir}"
+  _msg_info "           Target network:   ${target_network}"
   _msg_info "    Application options:"
   _msg_info "          Cache directory:   ${cache_dir}"
 }
@@ -893,6 +892,7 @@ _global_variables
 _requirements
 _config_user_init \
   "${app_name}"
+_libevm_global_variables
 # shellcheck disable=SC2034
 getopts_opts="$( \
   printf \

@@ -978,7 +978,6 @@ _globals
 _global_variables
 _requirements
 _libevm_global_variables
-# shellcheck disable=SC2004
 # shellcheck disable=SC2034
 getopts_opts="$( \
   printf \
