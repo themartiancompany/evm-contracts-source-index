@@ -826,7 +826,7 @@ _evm_version_check() {
     "prague"
     "osaka"
   )
-  if [[ " ${_evm_versions[*]} " != *" ${_data}  "* ]]; then
+  if [[ " ${_evm_versions[*]} " != *" ${_data} "* ]]; then
     _msg=(
       "Invalid EVM version '${_data}'."
     )
