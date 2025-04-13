@@ -776,7 +776,7 @@ _compiler_version_check() {
   local \
     _data="${1}"
   _msg=(
-    "Invalid version number."
+    "Invalid compiler version number '${_data}'."
   )
   echo \
     "${_data}" | \
@@ -842,7 +842,7 @@ _contract_data_save() {
     _data="${2}" \
     _output_file \
     _msg=()
-  _output_file="${_output_dir}/${_type}.txt"
+  _output_file="${_publisher_dir}/${_type}.txt"
   if (( 2 < "$#" )); then
     _output_file="${3}"
   fi
@@ -1070,6 +1070,9 @@ _evm_contract_source_get() {
         mv \
           "${_publisher_dir}/${_contract_address}.sol" \
           "${_output_dir}"
+	mv \
+          "${_publisher_dir}/"{"evm_version","compiler_version"}".txt" \
+	  "${_output_dir}"
       fi
       break
     fi
