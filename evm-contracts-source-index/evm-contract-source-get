@@ -798,7 +798,7 @@ _contract_compiler_check() {
   )
   if [[ " ${_compilers[*]} " != *" ${_data} "* ]]; then
     _msg=(
-      "Invalid compiler."
+      "Invalid compiler '${_data}'."
     )
     _msg_error \
       "${_msg[*]}" \
@@ -1024,7 +1024,7 @@ _evm_contract_source_get() {
         "${_retrieve_opts[@]}"
       _contract_data_save \
         "contract_compiler" \
-        "${_evm_version}"
+        "${_contract_compiler}"
       _compiler_version_retrieve \
         "${_retrieve_opts[@]}"
       _contract_data_save \
