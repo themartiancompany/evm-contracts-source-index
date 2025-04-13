@@ -297,7 +297,7 @@ _evm_contract_source_verify() {
         "'${_solidity_compiler_opts[*]}'."
       )
       _msg_info \
-        "${_msg[*]"
+        "${_msg[*]}"
     elif [[ ! -e "${_contract_file}" ]]; then
       _msg=(
         _msg_error \
