@@ -789,6 +789,16 @@ _compiler_version_check() {
       1
 }
 
+_tx_deployment_check() {
+  local \
+    _data="${1}"
+  _msg=(
+    "Invalid compiler version number '${_data}'."
+  )
+  _tx_hash_sanity_check \
+    "${_data}"
+}
+
 _contract_compiler_check() {
   local \
     _data="${1}" \
