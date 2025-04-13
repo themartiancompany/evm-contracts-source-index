@@ -526,6 +526,7 @@ _deployer_get() {
     )
     _msg_info \
       "${_msg[*]}"
+    _tx_deployment=""
   elif [[ "${_tx_deployment}" != "${_tx_null}" ]]; then
     _msg=(
       "Retrieving the deployer from publisher '${_publisher}'"
@@ -580,7 +581,6 @@ _publisher_auto_detect() {
   local \
     _publishers_amount \
     _locked \
-    _tx_deployment \
     _publisher \
     _cursor \
     _publisher_no \
