@@ -253,6 +253,12 @@ _evm_contract_source_verify() {
     "${_msg[*]}"
   if [[ "${_bytecode_verify}" == "runtime" ]]; then
     if [[ "${_contract_file}" == "" ]]; then
+      _msg=(
+        "No contract file specified,"
+        "retrieving from the Index."
+      )
+      _msg_info \
+        "${_msg[*]}"
       # _contract_artifacts_auto_detect \
       #   "${_deployments_dir}" \
       #   "${_target_network}" \
@@ -278,7 +284,6 @@ _evm_contract_source_verify() {
         "Not implemented." \
         1
     fi
-
     if [[ -e "${_contract_file}" ]]; then
       _sum="$( \
         _file_hash \
@@ -524,8 +529,9 @@ _show_config() {
   _msg_info "${app_name} configuration"
   _msg_info "        Verification date:   ${verify_date}"
   _msg_info "    Bytecode verification:   ${bytecode_verify}"
-  _msg_info "         Contract address:   ${contract_address}"
   _msg_info "         Contract network:   ${contract_network}"
+  _msg_info "         Contract address:   ${contract_address}"
+  _msg_info "   Deployment transaction:   ${transaction_deployment}"
   _msg_info "         Target publisher:   ${target_publisher}"
   _msg_info "          Contract source:   ${contract_file}"
   _msg_info "             Solc version:   ${solc_version}"
