@@ -442,6 +442,10 @@ _source_archive_extract() {
     -o
       "${_tar_archive}"
   )
+  rm \
+    -rf \
+    "${_tar_archive}" || \
+    true
   evm-gpg-decrypt \
     "${_evm_gpg_decrypt_opts[@]}" \
     "${_source_archive}" \
