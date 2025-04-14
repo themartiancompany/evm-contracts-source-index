@@ -458,7 +458,7 @@ _evm_contract_source_verify() {
           echo \
             "${_msg[*]}"
           break
-        elif [[ "${_bytecode_runtime}" == "${_bytecode_deployed}" ]]; then
+        elif [[ "${_bytecode_runtime}" != "${_bytecode_deployed}" ]]; then
           _msg=(
             "Woah."
           )
