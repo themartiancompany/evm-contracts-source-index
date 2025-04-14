@@ -358,7 +358,7 @@ _evm_contract_source_verify() {
       _evm_contract_bytecode_get_opts_setup
       _msg=(
         "Running 'evm-contract-bytecode-get'"
-        "weth options"
+        "with options"
         "'${_evm_contract_bytecode_get_opts[*]}'."
       )
       _msg_info \
@@ -458,6 +458,12 @@ _evm_contract_source_verify() {
           echo \
             "${_msg[*]}"
           break
+        elif [[ "${_bytecode_runtime}" == "${_bytecode_deployed}" ]]; then
+          _msg=(
+            "Woah."
+          )
+          _msg_info \
+            "${_msg[*]}"
         fi
       fi
     done
