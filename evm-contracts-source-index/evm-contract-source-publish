@@ -415,15 +415,15 @@ _source_locked_check() {
   fi
 }
 
-_contract_address_check() {
-  local \
-    _
-  _tx_deployment="$( \
-    _lower \
-      "${_tx_deployment}")"
-  _bytes32_check \
-    "${_tx_deployment}"
-}
+# _contract_address_check() {
+#   local \
+#     _
+#   _tx_deployment="$( \
+#     _lower \
+#       "${_tx_deployment}")"
+#   _bytes32_check \
+#     "${_tx_deployment}"
+# }
 
 _evm_contract_source_publish() {
   local \
