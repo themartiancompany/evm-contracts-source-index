@@ -737,36 +737,6 @@ _pgp_email_auto_detect() {
     "${_email}"
 }
 
-_platform_auto_detect() {
-  local \
-    _platform="arch" \
-    _os
-  _os="$( \
-    uname \
-      -o)"
-  if [[ "${_os}" == "Android" ]] || \
-     [[ -v "TERMUX_VERSION" ]]; then
-    _platform="termux"
-  fi
-  echo \
-    "${_platform}"
-}
-
-_package_type_auto_detect() {
-  local \
-    _type
-  if [[ "${publishing_platform}" == "fur" ]]; then
-    _type="binary"
-  elif [[ "${publishing_platform}" == "ur" || \
-          "${publishing_platform}" == "gur"  ]]; then
-    _type="source"
-  fi
-  _set_override \
-    "package" \
-    "type" \
-    "${_type}"
-}
-
 # Set defaults and, if present, overrides
 # from arch-grub command line option parameters
 _set_overrides() {
