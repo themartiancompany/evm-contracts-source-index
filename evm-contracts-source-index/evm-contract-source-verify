@@ -42,6 +42,7 @@ _sourced \
 # shellcheck disable=SC2034
 _global_variables() {
   verify_date=""
+  contract_network=""
   contract_address=""
   contract_file=""
   transaction_deployment=""
@@ -51,6 +52,7 @@ _global_variables() {
   solc_version=""
   evm_version=""
   target_network=""
+  target_publisher=""
   cache_dir=""
   command_args=()
   color=""
@@ -81,7 +83,7 @@ _requirements() {
 _get_conf_dir_path() {
   local \
     _dir
-  _dir="${HOME}/.config/evmfs"
+  _dir="${HOME}/.config/${app_name}"
   echo \
     "${_dir}"
 }
@@ -90,83 +92,31 @@ _cache_dir_auto_detect() {
   local \
     _dir
   _dir="${HOME}/.cache/${app_name}"
-  echo \
-    "${_dir}"
-}
-
-_chunk_verify() {
-  local \
-    _contract="${1}" \
-    _namespace="${2}" \
-    _sum="${3}" \
-    _index="${4}" \
-    _chunk="${5}" \
-    _remote \
-    _verify_dir \
-    _local_sum \
-    _remote_sum \
-    _msg=()
-  _verify_dir="${_cache_dir}/${_sum}/verify"
-  _remote="${_verify_dir}/${_index}"
   mkdir \
     -p \
-    "${_verify_dir}"
-  evm-contract-call \
-    "${_verify_call_opts[@]}" \
-    "${_fs_address}" \
-    "chunks" \
-    "${_namespace}" \
-    "${_sum}" \
-    "${_index}" > \
-    "${_remote}"
-  _local_sum="$( \
-    _file_hash \
-      "${_chunk}")"
-  _remote_sum="$( \
-    _file_hash \
-      "${_remote}")"
-  if [[ "${_local_sum}" != "${_remote_sum}" ]]; then
-    _msg=(
-      "somehow local chunk '${_chunk}',"
-      "corresponding to chunk having"
-      "index '${_index}' on the blockchain"
-      "has not been written correctly"
-      "on the blockchain at address '$(_publishing_address_get)'"
-    )
-    _msg_error \
-      "${_msg[*]}" \
-      1
-  fi
-}
-
-_sum_get() {
-  local \
-    _content="${1}" 
-  echo \
-    "${_content}" | \
-    sha256sum | \
-      awk \
-        '{print $1}'
+    "${_dir}"
+  chmod \
+    700 \
+    "${_dir}"
+  _set_override \
+    "cache" \
+    "dir" \
+    "${_dir}"
 }
 
 _file_hash() {
   local \
-    _file="${1}" \
-    _content
-  _content="$( \
-    cat \
-      "${_file}")"
-  _sum="$( \
-    _sum_get \
-      "${_content}")"
-  echo \
-   "${_sum}" 
+    _file="${1}"
+  sha256sum \
+    "${_file}" | \
+    awk \
+      '{print $1}'
 }
 
 _work_dir_setup() {
   local \
     _msg=()
-  _tmp_dir="${_cache_dir}/${_target_network}/${_contract_address}"
+  _tmp_dir="${_cache_dir}/${_contract_network}/${_contract_address}"
   _msg=(
     "Setting up work directory"
     "'${_tmp_dir}'."
@@ -176,44 +126,60 @@ _work_dir_setup() {
   mkdir \
     -p \
     "${_tmp_dir}"
+  chmod \
+    700 \
+    "${_tmp_dir}"
 }
 
-_file_encode() {
-  local \
-    _msg=() \
-    _length
-  _length=22000
-  _chunk_prefix="$( \
-    mktemp \
-      -u \
-      -p \
-      "${_tmp_dir}" \
-      --suffix=".base64")"
-  _file_size_check \
-    "${_file}"
-  _bin2txt_opts+=(
-    -L
-      "${_length}"
-  )
+_evm_contract_bytecode_get_opts_setup() {
+  _evm_contract_bytecode_get_opts=()
+  _bytecode_deployed_dir="${_cache_dir}/${_contract_network}/${_contract_address}"
+  _bytecode_deployed_path="${_bytecode_deployed_dir}/runtime.txt"
+  mkdir \
+    -p \
+    "${_bytecode_deployed_dir}"
+  chmod \
+    700 \
+    "${_bytecode_deployed_dir}"
   if [[ "${quiet}" == "n" ]]; then
-    _bin2txt_opts+=(
+    _evm_contract_bytecode_get_opts+=(
       -v
     )
   fi
-  _msg=(
-    "encoding file with base64 encoding"
-    "and splitting it into 22000 characters"
-    "chunks"
+  _evm_contract_bytecode_get_opts+=(
+    -t
+      "${_bytecode_verify}"
   )
-  _msg_info \
-    "${_msg[*]}"
-  bin2txt \
-    "${_bin2txt_opts[@]}" \
-    "${_file}" \
-    "${_chunk_prefix}"
+  if [[ "${_contract_network}" != "" ]]; then
+    _evm_contract_bytecode_get_opts+=(
+      -n
+        "${_contract_network}"
+    )
+  fi
+  _evm_contract_bytecode_get_opts+=(
+    -o
+      "${_bytecode_deployed_path}"
+  )
 }
 
 _evm_contract_source_get_opts_setup() {
+  if [[ "${quiet}" == "n" ]]; then
+    _evm_contract_source_get_opts+=(
+      -v
+    )
+  fi
+  if [[ "${_si_address}" != "" ]]; then
+    _evm_contract_source_get_opts+=(
+      -A
+        "${_si_address}"
+    )
+  fi
+  if [[ "${_si_version}" != "" ]]; then
+    _evm_contract_source_get_opts+=(
+      -V
+        "${_si_version}"
+    )
+  fi
   if [[ "${_wallet_name}" != "" ]]; then
     _evm_contract_source_get_opts+=(
       -N
@@ -250,14 +216,60 @@ _evm_contract_source_get_opts_setup() {
         "${_target_network}"
     )
   fi
-
 }
 
 _solidity_compiler_opts_setup() {
-  _solidity_compiler_opts=()
+  local \
+    _bytecode_verify="${1}"
+  _solidity_compiler_opts=(
+    # Only solc supported for now.
+    -b
+      "solc"
+  )
   if [[ "${quiet}" == "n" ]]; then
     _solidity_compiler_opts+=(
       -v
+    )
+  fi
+  if [[ "${_solc_version}" != "" ]]; then
+    _solidity_compiler_opts+=(
+      -C
+        "${_solc_version}"
+    )
+  fi
+  if [[ "${_evm_version}" != "" ]]; then
+    _solidity_compiler_opts+=(
+      -e
+        "${_evm_version}"
+    )
+  fi
+  if [[ "${_bytecode_verify}" == "runtime" ]]; then
+    _solidity_compiler_opts+=(
+      -t
+        # "bytecode_runtime"
+        'all'
+      -o
+        "${_contract_dir}"
+    )
+  fi
+}
+
+_bytecode_runtime_paths_find() {
+  mapfile \
+    -d \
+    $'\0' \
+    _bytecode_runtime_paths < \
+    <(find \
+        "${_contract_dir}" \
+        -name \
+          "*.bin-runtime" \
+        -type \
+          "f" \
+        -print0 || \
+      true)
+  if [[ -e "${_contract_dir}/${_contract_name}.runtime.bin" ]]; then
+    _bytecode_runtime_paths+=(
+      "${_contract_dir}/${_contract_name}.runtime.bin"
     )
   fi
 }
@@ -275,29 +287,33 @@ _evm_contract_source_verify() {
     _target_network="${9}" \
     _api_key_path="${10}" \
     _bytecode_verify="${11}" \
-    _cache_dir="${12}" 
-    _contract_address="${13}" \
-    _target_publisher="${14}" \
-    _contract_file="${15}" \
-    _transaction_deployment="${16}" \
-    _evm_version="${17}" \
-    _solc_version="${18}" \
+    _cache_dir="${12}" \
+    _contract_network="${13}" \
+    _contract_address="${14}" \
+    _target_publisher="${15}" \
+    _contract_file="${16}" \
+    _transaction_deployment="${17}" \
+    _evm_version="${18}" \
+    _solc_version="${19}" \
     _command_args=() \
     _evm_contract_source_get_opts=() \
+    _contract_dir \
     _solidity_compiler_opts=() \
-    _cmd \
-    _args=() \
-    _namespace \
-    _fs_abi \
-    _fs_bytecode \
-    _fs_compiler_output
+    _evm_contract_bytecode_get_opts=() \
+    _bytecode_deployed \
+    _bytecode_deployed_path \
+    _bytecode_runtime \
+    _bytecode_runtime_path \
+    _bytecode_runtime_paths=() \
+    _si_abi \
+    _si_bytecode \
+    _si_compiler_output \
+    _sum
   shift \
-    18
+    19
   _command_args+=(
     "$@"
   )
-  if [[ "${quiet}" == "n" ]]; then
-  fi
   _msg=(
     "Verifying source for"
     "contract '${_contract_address}'"
@@ -307,26 +323,156 @@ _evm_contract_source_verify() {
   _msg_info \
     "${_msg[*]}"
   if [[ "${_bytecode_verify}" == "runtime" ]]; then
+      _msg=(
+        "Bytecode verification:"
+        "'${_bytecode_verify}'."
+      )
+      _msg_info \
+        "${_msg[*]}"
     if [[ "${_contract_file}" == "" ]]; then
+      _msg=(
+        "No contract file specified,"
+        "retrieving from the Index."
+      )
+      _msg_info \
+        "${_msg[*]}"
       _evm_contract_source_get_opts_setup
       # TODO:
-      # evm-contract-source-get \
-      #   "${_evm_contract_source_get_opts[@]}"
-      #   "${_contract_address}"
+      evm-contract-source-get \
+        "${_evm_contract_source_get_opts[@]}" \
+        "${_contract_network}" \
+        "${_contract_address}"
       _msg_error \
-        "Not implemented." \
+        "Retrieving source code not implemented." \
         1
     fi
+    if [[ "${_transaction_deployment}" != "" ]]; then
+      _msg=(
+        "Getting bytecode for"
+        "deployment transaction"
+        "'${_transaction_deployment}'"
+        "on network '${_contract_network}'."
+      )
+      _msg_info \
+        "${_msg[*]}"
+      _evm_contract_bytecode_get_opts_setup
+      _msg=(
+        "Running 'evm-contract-bytecode-get'"
+        "with options"
+        "'${_evm_contract_bytecode_get_opts[*]}'."
+      )
+      _msg_info \
+        "${_msg[*]}"
+      evm-contract-bytecode-get \
+        "${_evm_contract_bytecode_get_opts[@]}" \
+        "${_contract_address}" \
+        "${_transaction_deployment}"
+    elif [[ "${_transaction_deployment}" == "" ]]; then
+      _msg=(
+        "No deployment transaction specified,"
+        "retrieving from the Index."
+      )
+      _msg_info \
+        "${_msg[*]}"
+      _msg_error \
+        "Retrieving deployment transaction from the Index not implemented." \
+        1
+      # TODO:
+      # _evm_contract_source_get_opts_setup
+      evm-contract-source-get \
+        "${_evm_contract_source_get_opts[@]}"
+        "${_contract_network}"
+        "${_contract_address}"
+    fi
     if [[ -e "${_contract_file}" ]]; then
-      _solidity_compiler_opts_setup
+      _sum="$( \
+        _file_hash \
+          "${_contract_file}")"
+      _contract_dir="${_cache_dir}/${_sum}"
+      _contract_name="$( \
+        basename \
+          "${_contract_file%.sol}")"
+      mkdir \
+        -p \
+        "${_contract_dir}"
+      _solidity_compiler_opts_setup \
+        "${_bytecode_verify}"
+      # This needs to be adjusted
+      _msg=(
+        "Building local contract file"
+        "'${_contract_file}' in directory"
+        "'${_contract_dir}'"
+        "with options '${_solidity_compiler_opts[*]}'."
+      )
+      _msg_info \
+        "${_msg[*]}"
       solidity-compiler \
         "${_solidity_compiler_opts[@]}" \
         "${_contract_file}"
+      _bytecode_runtime_paths_find
+      _msg=(
+        "Built runtime bytecode"
+        "'${_bytecode_runtime_paths[@]}'"
+        "local contract file '${_contract_file}'"
+        "runtime bytecode with options"
+        "'${_solidity_compiler_opts[*]}'."
+      )
+      _msg_info \
+        "${_msg[*]}"
     elif [[ ! -e "${_contract_file}" ]]; then
       _msg=(
-        _msg_error \
-          "Not implemented." \
-          1
+          "Automatically retrieving contract file not implemented."
+      )
+      _msg_error \
+        "${_msg[*]}" \
+        1
+    fi
+    _bytecode_deployed="$( \
+      cat \
+        "${_bytecode_deployed_path}")"
+    _msg=(
+      "Deployed bytecode '${_bytecode_deployed_path}' length:"
+      "'${#_bytecode_deployed}'."
+    )
+    _msg_info \
+      "${_msg[*]}"
+    for _bytecode_runtime_path in "${_bytecode_runtime_paths[@]}"; do
+      _bytecode_runtime="0x$( \
+        cat \
+          "${_bytecode_runtime_path}")"
+      _msg=(
+        "Runtime bytecode '${_bytecode_runtime_path}' length:"
+        "'${#_bytecode_runtime}'."
+      )
+      _msg_info \
+        "${_msg[*]}"
+      if [[ "${#_bytecode_runtime}" == "${#_bytecode_deployed}" ]]; then
+        if [[ "${_bytecode_runtime}" == "${_bytecode_deployed}" ]]; then
+          _msg=(
+            "The source code '${_contract_file}'"
+            "and the contract at the deployment"
+            "transaction '${_transaction_deployment}'"
+            "have the same runtime bytecode for"
+            "'${_bytecode_runtime_path}'."
+          )
+          echo \
+            "${_msg[*]}"
+          break
+        elif [[ "${_bytecode_runtime}" != "${_bytecode_deployed}" ]]; then
+          _msg=(
+            "Woah."
+          )
+          _msg_info \
+            "${_msg[*]}"
+        fi
+      fi
+    done
+    if [[ "${_bytecode_runtime}" != "${_bytecode_deployed}" ]]; then
+      _msg=(
+        "None of runtime bytecode '${_bytecode_runtime_paths[*]}'"
+        "for the provided source '${_contract_file}' are the same as"
+        "deployed bytecode at file '${_bytecode_deployed_path}' for"
+        "the deployment transaction '${_transaction_deployment}'."
       )
       _msg_error \
         "${_msg[*]}" \
@@ -342,353 +488,6 @@ _evm_contract_source_verify() {
       "${_msg[*]}" \
       1
   fi
-  # _contract_artifacts_auto_detect \
-  #   "${_deployments_dir}" \
-  #   "${_target_network}" \
-  #   "SourceIndex" \
-  #   "_si" \
-  #   "${_si_version}"
-  # _contract_data_retrieve
-  # _namespace="$( \
-  #   evm-wallet \
-  #    get \
-  #      "${_wallet_name}" \
-  #      "address")"
-  # _fs_abi="$( \
-  #   _abi_get \
-  #     "${_deployments_dir}" \
-  #     "${_target_network}" \
-  #     "FileSystem" \
-  #     "${_fs_version}")"
-  # _fs_bytecode="$( \
-  #   _bytecode_get \
-  #     "${_deployments_dir}" \
-  #     "${_target_network}" \
-  #     "FileSystem" \
-  #     "${_fs_version}")"
-  # _fs_compiler_output="$( \
-  #   _compiler_output_get \
-  #     "${_deployments_dir}" \
-  #     "${_target_network}" \
-  #     "FileSystem" \
-  #     "${_fs_version}")"
-  # if [[ "${_upload_method}" == "standalone" ]]; then
-  #   _file_upload_standalone \
-  #     "${_target_network}" \
-  #     "${_fs_address}" \
-  #     "${_namespace}" \
-  #     "${_target_file}" \
-  #     "${_fs_abi}" \
-  #     "${_fs_bytecode}" \
-  #     "${_fs_compiler_output}"
-  # else
-  #   _msg_error \
-  #     "unknown upload method '${_upload_method}'"
-  # fi
-}
-
-_wallet_path_get() {
-  local \
-    _path \
-    _name
-  _name="$( \
-    _get \
-      "wallet" \
-      "name")"
-  _path="$( \
-    _get_conf_dir_path)/${_name}.dat"
-  echo \
-    "${_path}"
-}
-
-_secret_get() {
-  local \
-    _secret="${1}" \
-    _path \
-    _name
-  _name="$( \
-    _get \
-      "wallet" \
-      "name")"
-  _path="$( \
-    _get_conf_dir_path)/${_name}-${_secret}.txt"
-  echo \
-    "${_path}"
-}
-
-_api_key_auto_detect() {
-  local \
-    _chain="${1}" \
-    _chain_name \
-    _key \
-    _msg=()
-  _key="$( \
-    evm-chains-explorers \
-      -c \
-        "${_chain}" \
-      -s \
-        'kirsh' \
-      get \
-        keys)"
-  _chain_name="$( \
-    evm-chains-info \
-      -o \
-        "name" \
-      "${_chain}")"
-  if [[ ! -e "${_key}" ]]; then
-    _msg=(
-      "Found no provider services"
-      "keys for chain '${_chain_name}'."
-      "Check available service"
-      "providers with \"evm-chains-info"
-      "-o explorers '${_chain}'\""
-      "and add the relative api key in"
-      "'<user_home>/.config/evm-chains-explorers/<service>/default.txt'"
-    )
-    _msg_info \
-      "${_msg[*]}"
-  fi
-  _set_override \
-    "api" \
-    "key" \
-    "${_key}"
-}
-
-_secret_auto_detect() {
-  local \
-    _secret="${1}" \
-    _secret_type="${2}" \
-    _dir \
-    _key_gen_opts=() \
-    _msg=()
-  _path="$( \
-    _secret_get \
-      "${_secret}")"
-  _dir="$( \
-    dirname \
-      "${_path}")"
-  if [[ ! -e "${_path}" ]]; then
-    _key_gen_opts+=(
-      -t
-        "${_secret_type}"
-    )
-    _msg=(
-      "generating ${_secret} '${_path}'"
-    )
-    if [[ "${quiet}" == "n" ]]; then
-      _msg_info \
-        "${_msg[*]}"
-    fi
-    mkdir \
-      -p \
-      "${_dir}"
-    chmod \
-      700 \
-      "${_dir}"
-    chmod \
-      700 \
-      "${_dir}"
-    key-gen \
-      "${_key_gen_opts[@]}" \
-      "${_path}"
-    chmod \
-      400 \
-      "${_path}"
-    _msg=(
-      "${_secret} '${_path}' successfully generated"
-    )
-    if [[ "${quiet}" == "n" ]]; then
-      _msg_info \
-        "${_msg[*]}"
-    fi
-  fi
-  _set_override \
-    "wallet" \
-    "${_secret}" \
-    "${_path}"
-}
-
-_deployments_dir_auto_detect() {
-  local \
-    _user_level \
-    _evm_contract_deployments_dir_opts=() \
-    _deployments_dir \
-    _system_deployments
-  _user_level="$( \
-    _get \
-      "user" \
-      "level")"
-  if [[ "${_user_level}" == "y" ]]; then
-    _evm_contract_deployments_dir_opts+=(
-      -u
-    )
-  fi
-  _deployments_dir="$( \
-    evm-contract-deployments-dir \
-      "${_evm_contract_deployments_dir_opts[@]}" \
-      "evmfs")"
-  if [[ ! -d "${_deployments_dir}" ]]; then
-    _system_deployments="$( \
-     evm-contract-deployments-dir \
-       "evmfs")"
-    _msg=(
-      "user deployments directory"
-      "'${_deployments_dir}' does"
-      "not exists, importing system deployments"
-      "directory '${_system_deployments}'"
-    )
-    _msg_info \
-      "${_msg[*]}"
-    mkdir \
-      -p \
-      "${_deployments_dir}"
-    chmod \
-      700 \
-      "${_deployments_dir}"
-    cp \
-     -r \
-     "${_system_deployments}/"* \
-     "${_deployments_dir}"
-  fi
-  _set_override \
-    "deployments" \
-    "dir" \
-    "${_deployments_dir}"
-}
-
-_network_auto_detect() {
-  local \
-    _contract \
-    _contract_deployment \
-    _deployments \
-    _user \
-    _msg=()
-  _contract="FileSystem"
-  _deployments="$( \
-    _get \
-      "deployments" \
-      "dir")"
-  _contract_deployment="${_deployments}/${_contract}"
-  _user="$( \
-    _get \
-      "user" \
-      "level")"
-  if [[ "${_user}" == "y" ]]; then
-    _msg=(
-     "User deployments enabled, looking"
-     "for cheapest network deployments at" 
-     "path '${_contract_deployment}'"
-   )
-   _msg_info \
-     "${_msg[*]}"
-  fi
-  _network="$( \
-    evm-contract-deployment-networks \
-      -C \
-      "${_contract_deployment}")"
-  if [[ "${_user}" == "y" ]]; then
-    _msg=(
-      "Found network '${_network}'"
-    )
-    _msg_info \
-      "${_msg[*]}"
-  fi
-  _set_override \
-    "target" \
-    "network" \
-    "${_network}"
-}
-
-_fs_version_auto_detect() {
-  local \
-    _config \
-    _deployments \
-    _network \
-    _version
-  _deployments="$( \
-    _get \
-      "deployments" \
-      "dir")"
-  _network="$( \
-    _get \
-      "target" \
-      "network")"
-  _config="${_deployments}/FileSystem/${_network}/config.sh"
-  _version="$( \
-    evm-contract-deployment-versions \
-      -H \
-      "${_config}")"
-  _set_override \
-    "fs" \
-    "version" \
-    "${_version}"
-}
-
-_fs_address_auto_detect() {
-  local \
-    _address \
-    _network \
-    _deployments \
-    _user \
-    _version \
-    _evm_contract_deployment_address_opts=() \
-    _msg=()
-  _network="$( \
-    _get \
-      "target" \
-      "network")"
-  _evm_contract_deployment_address_opts+=(
-    -n
-      "${_network}"
-  )
-  _version="$( \
-    _get \
-      "fs" \
-      "version")"
-  if [[ "${_version}" != "" ]]; then
-    _evm_contract_deployment_address_opts+=(
-      -V
-        "${_version}"
-    )
-  fi
-  _user="$( \
-    _get \
-      "user" \
-      "level")"
-  if [[ "${_user}" == "n" ]]; then
-    _evm_contract_deployment_address_opts+=(
-      -a
-        "evmfs"
-    )
-  elif [[ "${_user}" == "y" ]]; then
-    _deployments="$( \
-      _get \
-        "deployments" \
-        "dir")"
-    _evm_contract_deployment_address_opts+=(
-      -u
-      -d
-        "${_deployments}" 
-    )
-  fi
-  _address="$( \
-    evm-contract-deployment-address \
-      "${_evm_contract_deployment_address_opts[@]}" \
-      "FileSystem")"
-  if [[ "${_address}" == "" ]]; then
-    _msg=(
-      "error getting FileSystem version"
-      "${_version} deployment address"
-      "for network '${_network}'"
-    )
-    _msg_error \
-      "${_msg[*]}" \
-      1
-  fi
-  _set_override \
-    "fs" \
-    "address" \
-    "${_address}"
 }
 
 _set_overrides() {
@@ -726,6 +525,14 @@ _set_overrides() {
     "rpc" \
     "selection" \
     "kirsh"
+  _set_override \
+    "target" \
+    "publisher" \
+    ""
+  _set_override \
+    "contract" \
+    "network" \
+    "${target_network}"
   _deployments_dir_auto_detect \
     "evm-contracts-source-index" \
     "${user_level}"
@@ -741,7 +548,7 @@ _set_overrides() {
     "${call_auth}"
   _set_override \
     "bytecode" \
-    "verification" \
+    "verify" \
     "runtime"
   _set_override \
     "evm" \
@@ -756,9 +563,10 @@ _set_overrides() {
     "file" \
     ""
   _set_override \
-    "cache" \
-    "dir" \
-    "$(_cache_dir_auto_detect)"
+    "transaction" \
+    "deployment" \
+    ""
+  _cache_dir_auto_detect
   _contract_setup_auto_detect \
     "evm-contracts-source-index" \
     "SourceIndex" \
@@ -788,11 +596,12 @@ _usage() {
       _usage_text << \
         ENDUSAGETEXT || true
 
-EVM network smart contract verifier
+EVM-compatible network smart contract source verifier
 
 Usage:
   ${app_name}
     [options]
+    <contract_network>
     <contract_address>
 
   networks:
@@ -803,7 +612,7 @@ $(_display_networks \
      -i <contract_file>     If not specified will try to get
                             one from the index.
                             Default: ${contract_file}
-     -b <bytecode_verify>   It can be 'standalone' or 'bulk'
+     -b <bytecode_verify>   It can be 'runtime'.
                             Default: ${bytecode_verify}
      -e <evm_version>       EVM version for the contract.
                             Default: ${evm_version}
@@ -813,6 +622,8 @@ $(_display_networks \
                             Default: ${solc_version}
      -T <tx_deployment>     Deployment transaction for this contract.
                             Default: ${transaction_deployment}
+     -P <target_publisher>  Specify publisher for this contract.
+                            Default: ${target_publisher}
 
   contract options:
      -A <si_address>        Address of the EVM contract source
@@ -863,21 +674,30 @@ ENDUSAGETEXT
 _show_config() {
   _msg_info "${app_name} configuration"
   _msg_info "        Verification date:   ${verify_date}"
-  _msg_info "            Index address:   ${si_address}"
-  _msg_info "            Index version:   ${si_version}"
-  _msg_info "               User level:   ${user_level}"
-  _msg_info "    Deployments directory:   ${deployments_dir}"
-  _msg_info "                Namespace:   ${wallet_address}"
+  _msg_info "    Bytecode verification:   ${bytecode_verify}"
+  _msg_info "         Contract network:   ${contract_network}"
+  _msg_info "         Contract address:   ${contract_address}"
+  _msg_info "   Deployment transaction:   ${transaction_deployment}"
+  _msg_info "         Target publisher:   ${target_publisher}"
+  _msg_info "          Contract source:   ${contract_file}"
+  _msg_info "             Solc version:   ${solc_version}"
+  _msg_info "              EVM version:   ${evm_version}"
+  _msg_info "       Contract options:"
+  _msg_info "     Source Index address:   ${si_address}"
+  _msg_info "     Source Index version:   ${si_version}"
+  _msg_info "    Credentials options:"
   _msg_info "              Wallet name:   ${wallet_name}"
   _msg_info "              Wallet path:   ${wallet_path}"
   _msg_info "          Wallet password:   ${wallet_password}"
   _msg_info "              Wallet seed:   ${wallet_seed}"
-  _msg_info "           Target network:   ${target_network}"
   _msg_info "                  API key:   ${api_key}"
-  _msg_info "            Upload method:   ${upload_method}"
+  _msg_info "           Wallet address:   ${wallet_address}"
+  _msg_info "         LibEVM options:"
+  _msg_info "               User level:   ${user_level}"
+  _msg_info "    Deployments directory:   ${deployments_dir}"
+  _msg_info "           Target network:   ${target_network}"
+  _msg_info "    Application options:"
   _msg_info "          Cache directory:   ${cache_dir}"
-  _msg_info "         Target publisher:   ${target_publisher}"
-  _msg_info "           Target address:   ${target_file}"
 }
 
 _globals
@@ -885,11 +705,13 @@ _global_variables
 _requirements
 _config_user_init \
   "${app_name}"
+_libevm_global_variables
+_libevm_app_global_variables
 # shellcheck disable=SC2034
 getopts_opts="$( \
   printf \
     "%s" \
-    "i:b:e:S:T:" \
+    "i:b:e:S:T:P:" \
     "A:V:" \
     "$(_libevm_app_getopts_params_get)" \
     "n:" \
@@ -912,7 +734,9 @@ while \
     S) \
       override_solc_version="${OPTARG}" ;;
     T) \
-      override_tnansaction_deployment="${OPTARG}" ;;
+      override_transaction_deployment="${OPTARG}" ;;
+    P) \
+      override_target_publisher="${OPTARG}" ;;
     A) \
       override_si_address="${OPTARG}" ;;
     V) \
@@ -951,8 +775,19 @@ if (( $# < 1 )); then
   _usage \
     1
 fi
+if (( $# < 2 )); then
+  _msg_error \
+    "No contract address given." \
+    0
+  _set_overrides
+  _usage \
+    1
+fi
 if (( 0 < $# )); then
-  contract_address="${1}"
+  contract_network="${1}"
+fi
+if (( 1 < $# )); then
+  contract_address="${2}"
 fi
 shift \
   1 || \
@@ -975,6 +810,7 @@ app_opts=(
   "${api_key}"
   "${bytecode_verify}"
   "${cache_dir}"
+  "${contract_network}"
   "${contract_address}"
   "${target_publisher}"
   "${contract_file}"

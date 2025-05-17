@@ -53,6 +53,9 @@ _requirements() {
     'evm-contract-deployment-networks' \
     'evm-contracts-tools'
   _check_cmd \
+    'evm-contract-source-verify' \
+    'evm-contracts-source-index'
+  _check_cmd \
     'evm-openpgp-key-receive' \
     'evm-openpgp-keyserver'
   _check_cmd \
@@ -439,6 +442,10 @@ _source_archive_extract() {
     -o
       "${_tar_archive}"
   )
+  rm \
+    -rf \
+    "${_tar_archive}" || \
+    true
   evm-gpg-decrypt \
     "${_evm_gpg_decrypt_opts[@]}" \
     "${_source_archive}" \
@@ -501,7 +508,6 @@ _deployer_get() {
   local \
     _publisher="${1}" \
     _evm_contract_deployer_get_opts=() \
-    _tx_deployment \
     _tx_null \
     _msg=()
   _tx_null="0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -524,6 +530,7 @@ _deployer_get() {
     )
     _msg_info \
       "${_msg[*]}"
+    _tx_deployment=""
   elif [[ "${_tx_deployment}" != "${_tx_null}" ]]; then
     _msg=(
       "Retrieving the deployer from publisher '${_publisher}'"
@@ -544,6 +551,7 @@ _deployer_get() {
     )
     _msg_info \
       "${_msg[*]}"
+    _tx_deployment=""
   elif [[ "${_deployer}" != "" ]]; then
     _msg=(
       "Found deployer '${_deployer}'."
@@ -577,7 +585,6 @@ _publisher_auto_detect() {
   local \
     _publishers_amount \
     _locked \
-    _tx_deployment \
     _publisher \
     _cursor \
     _publisher_no \
@@ -774,16 +781,26 @@ _compiler_version_check() {
   local \
     _data="${1}"
   _msg=(
-    "Invalid version number."
+    "Invalid compiler version number '${_data}'."
   )
   echo \
     "${_data}" | \
     grep \
-      -e \
-        "^([0-9].)([0-9].)([0-9].)$" || \
+      -E \
+        '^([0-9]*).([0-9]*).([0-9]*)$' || \
     _msg_error \
       "${_msg[*]}" \
       1
+}
+
+_tx_deployment_check() {
+  local \
+    _data="${1}"
+  _msg=(
+    "Invalid compiler version number '${_data}'."
+  )
+  _tx_hash_sanity_check \
+    "${_data}"
 }
 
 _contract_compiler_check() {
@@ -794,9 +811,9 @@ _contract_compiler_check() {
     "serpent"
     "solc"
   )
-  if [[ " ${_compilers[*]} " != *" ${_data}  "* ]]; then
+  if [[ " ${_compilers[*]} " != *" ${_data} "* ]]; then
     _msg=(
-      "Invalid compiler."
+      "Invalid compiler '${_data}'."
     )
     _msg_error \
       "${_msg[*]}" \
@@ -824,9 +841,9 @@ _evm_version_check() {
     "prague"
     "osaka"
   )
-  if [[ " ${_evm_versions[*]} " != *" ${_data}  "* ]]; then
+  if [[ " ${_evm_versions[*]} " != *" ${_data} "* ]]; then
     _msg=(
-      "Invalid EVM version."
+      "Invalid EVM version '${_data}'."
     )
     _msg_error \
       "${_msg[*]}" \
@@ -838,9 +855,9 @@ _contract_data_save() {
   local \
     _type="${1}" \
     _data="${2}" \
-    _output_file="${3}" \
+    _output_file \
     _msg=()
-  _output_file="${_output_dir}/${_type}.txt"
+  _output_file="${_publisher_dir}/${_type}.txt"
   if (( 2 < "$#" )); then
     _output_file="${3}"
   fi
@@ -852,7 +869,8 @@ _contract_data_save() {
       "${_msg[*]}" \
       1
   fi
-  "_${_type}_check"
+  "_${_type}_check" \
+    "${_data}"
   echo \
     "${_data}" > \
     "${_output_file}"
@@ -874,6 +892,45 @@ _output_type_check() {
       1
   fi
 }
+
+_evm_contract_source_verify_opts_setup() {
+  _evm_contract_source_verify_opts=(
+    -b
+      "runtime"
+    -i
+      "${_publisher_dir}/${_contract_address}.sol"
+  )
+  if [[ "${quiet}" == "n" ]]; then
+    _evm_contract_source_verify_opts+=(
+      -v
+    )
+  fi
+  if [[ "${_target_network}" != "" ]]; then
+    _evm_contract_source_verify_opts+=(
+      -n
+        "${_target_network}"
+    )
+  fi
+  if [[ "${_evm_version}" != "" ]]; then
+    _evm_contract_source_verify_opts+=(
+      -e
+        "${_evm_version}"
+    )
+  fi
+  if [[ "${_compiler_version}" != "" ]]; then
+    _evm_contract_source_verify_opts+=(
+      -S
+        "${_compiler_version}"
+    )
+  fi
+  if [[ "${_tx_deployment}" != "" ]]; then
+    _evm_contract_source_verify_opts+=(
+      -T
+        "${_tx_deployment}"
+    )
+  fi
+}
+
 
 _evm_contract_source_get() {
   local \
@@ -904,6 +961,7 @@ _evm_contract_source_get() {
     _si_bytecode \
     _si_compiler_output \
     _source_archive \
+    _tx_deployment \
     _evm_version \
     _contract_compiler \
     _compiler_version \
@@ -911,6 +969,7 @@ _evm_contract_source_get() {
     _gnupg_home \
     _evm_openpgp_keyserver_db_dir \
     _evm_openpgp_key_receive_opts=() \
+    _evm_contract_source_verify_opts=() \
     _value \
     _msg=()
   _output_type_check
@@ -980,19 +1039,27 @@ _evm_contract_source_get() {
         "${_retrieve_opts[@]}"
       _contract_data_save \
         "contract_compiler" \
-        "${_evm_version}"
+        "${_contract_compiler}"
       _compiler_version_retrieve \
         "${_retrieve_opts[@]}"
       _contract_data_save \
         "compiler_version" \
         "${_compiler_version}"
+      if [[ ! -v "_tx_deployment" ]] || \
+         [[ "${_tx_deployment}" == "" ]]; then
+        _tx_deployment_retrieve \
+          "${_retrieve_opts[@]}"
+      fi
+      _contract_data_save \
+        "tx_deployment" \
+        "${_tx_deployment}"
     elif [[ "${_output_type}" != "all" ]]; then
       "_${_output_type}_retrieve"
       if [[ "${_output_type}" != "contract_source" ]]; then
         _value=$( \
           _get \
             "" \
-            "${_type}")
+            "${_output_type}")
         _contract_data_save
           "${_output_type}" \
           "${_value}" \
@@ -1010,15 +1077,39 @@ _evm_contract_source_get() {
           "${_source_archive}" \
           "${_publisher_dir}" \
           "${_publisher}"
-	mv \
-          "${_publisher_dir}/${_contract_address}.sol" \
-	  "${_output_dir}"
         _retrieved="true"
       fi
     fi
     if [[ "${_retrieved}" == "true" ]]; then
-      # TODO:
+      # TODO WIP:
       #   bytecode verification.
+      _evm_contract_source_verify_opts_setup
+        evm-contract-source-verify \
+          "${_evm_contract_source_verify_opts[@]}" \
+          "${_contract_network}" \
+          "${_contract_address}"
+      _verified="$( \
+        evm-contract-source-verify \
+          "${_evm_contract_source_verify_opts[@]}" \
+          "${_contract_network}" \
+          "${_contract_address}")"
+      if [[ "${_verified}" == "" ]]; then
+        mv \
+          "${_publisher_dir}/${_contract_address}.sol" \
+          "${_output_dir}"
+        mv \
+          "${_publisher_dir}/"{"contract_compiler","evm_version","compiler_version"}".txt" \
+          "${_output_dir}"
+      if [[ "${deployer}" != "" ]]; then
+        mv \
+          "${_publisher_dir}/tx_deployment.txt" \
+	  "${output_dir}"
+	echo \
+	  "${_deployer}" > \
+          "${_output_dir}/deployer.txt"
+      fi
+
+      fi
       break
     fi
   done
@@ -1214,7 +1305,7 @@ _usage() {
       _usage_text << \
         ENDUSAGETEXT || true
 
-Build recipes retrieval tool.
+EVM Contracts source retrieval tool.
 
 Usage:
   ${app_name}
@@ -1422,6 +1513,13 @@ else
   contract_address="$( \
     _lower \
       "${2}")"
+fi
+if [[ "${contract_address}" == "" ]]; then
+  _msg_error \
+    "No contract address specified." \
+    0
+  _usage \
+    1
 fi
 _set_overrides
 app_opts+=(
