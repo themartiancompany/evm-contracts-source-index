@@ -950,7 +950,7 @@ _show_config() {
   _msg_info "            Target namespace:   ${target_publisher}"
   _msg_info "               Signature key:   ${pgp_fingerprint}"
   _msg_info "             Signature email:   ${pgp_email}"
-  _msg_info "           Target commit URI:   ${commit_uri}"
+  _msg_info "           Target source URI:   ${source_uri}"
   _msg_info "              Source publish:   ${source_publish}"
   _msg_info "     Target compiler version:   ${compiler_version}"
   _msg_info "         Contracts options:"
